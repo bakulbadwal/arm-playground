@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arm Playground</title>
+<meta name="description" content="An interactive two-joint planar arm for Unit 2 of the Hugging Face Robotics Course: forward and inverse kinematics, configuration space, the Jacobian, and feedback control.">
+<style>
+:root {
+  --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1f24; --muted: #62666f; --line: #d9d7cf;
+  --grid: #ecebe5; --link1: #2f6fdb; --link2: #e0751f; --joint: #1d1f24;
+  --target: #1a9b62; --ghost: #9aa0aa; --bad: #d23c3c; --ok: #1a9b62; --warn: #c98a00;
+  --floor: #8a7a66; --floor-c: #e5d6c1; --shelf: #6d5bd0; --shelf-c: #d9d2f7; --limit-c: #e4e4e4;
+  --reach: rgba(47,111,219,0.10); --free-c: #ffffff; --accent: #2f6fdb; --chip: #eef2fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --panel: #1d2026; --ink: #e8e9ec; --muted: #a0a5ae; --line: #343841;
+    --grid: #262a31; --link1: #6d9df0; --link2: #f0994f; --joint: #e8e9ec;
+    --target: #38c98a; --ghost: #6c727c; --bad: #ef6464; --ok: #38c98a; --warn: #e3b341;
+    --floor: #b7a58d; --floor-c: #4a4034; --shelf: #a597f5; --shelf-c: #3b3560; --limit-c: #30333a;
+    --reach: rgba(109,157,240,0.14); --free-c: #1d2026; --accent: #6d9df0; --chip: #232a38;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --panel: #1d2026; --ink: #e8e9ec; --muted: #a0a5ae; --line: #343841;
+  --grid: #262a31; --link1: #6d9df0; --link2: #f0994f; --joint: #e8e9ec;
+  --target: #38c98a; --ghost: #6c727c; --bad: #ef6464; --ok: #38c98a; --warn: #e3b341;
+  --floor: #b7a58d; --floor-c: #4a4034; --shelf: #a597f5; --shelf-c: #3b3560; --limit-c: #30333a;
+  --reach: rgba(109,157,240,0.14); --free-c: #1d2026; --accent: #6d9df0; --chip: #232a38;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; }
+header h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -0.01em; }
+header p { margin: 0; color: var(--muted); max-width: 760px; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+button, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+nav.tabs { display: flex; gap: 6px; margin: 16px 0 12px; flex-wrap: wrap; }
+nav.tabs button { border-radius: 999px; }
+nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+canvas { display: block; width: 100%; aspect-ratio: 1 / 1; touch-action: none; border-radius: 8px; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--line); }
+.lower { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; margin-top: 14px; }
+.ctl { display: grid; grid-template-columns: 150px 1fr 64px; gap: 6px 10px; align-items: center; margin-bottom: 4px; }
+.ctl label { font-size: 13px; color: var(--muted); }
+.ctl output { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.checks { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 14px; }
+.checks label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.math { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; line-height: 1.65;
+  background: var(--chip); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.pill.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.pill.bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.try ol { margin: 0; padding-left: 20px; }
+.try li { margin-bottom: 6px; }
+.try .src { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.hidden { display: none !important; }
+#plot { aspect-ratio: 4 / 1; margin-top: 8px; }
+.sub { font-size: 12px; color: var(--muted); }
+kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+@media (max-width: 860px) {
+  .panes, .lower { grid-template-columns: 1fr; }
+  .ctl { grid-template-columns: 118px 1fr 56px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <header>
+      <h1>Arm Playground</h1>
+      <p>A two-joint planar arm (the course's simplified SO-100) for Unit 2 of the Hugging Face Robotics Course. The left pane is <b>task space</b>, where the hand is. The right pane is <b>configuration space</b>: every pixel is one pair of joint angles (θ₁, θ₂).</p>
+    </header>
+    <button id="theme" title="Toggle light/dark">◐ Theme</button>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="fk">1 · Forward kinematics</button>
+    <button role="tab" data-tab="ik">2 · Inverse kinematics</button>
+    <button role="tab" data-tab="jac">3 · Jacobian &amp; diff-IK</button>
+    <button role="tab" data-tab="fb">4 · Feedback control</button>
+  </nav>
+
+  <div class="panes">
+    <section class="card">
+      <h2>Task space: where the hand is</h2>
+      <canvas id="task" aria-label="Task space view of the arm"></canvas>
+      <div class="legend" id="taskLegend"></div>
+    </section>
+    <section class="card">
+      <h2>Configuration space: (θ₁, θ₂)</h2>
+      <canvas id="cspace" aria-label="Configuration space map"></canvas>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--free-c)"></span>free</span>
+        <span><span class="sw" style="background:var(--floor-c)"></span>hits floor</span>
+        <span><span class="sw" style="background:var(--shelf-c)"></span>hits shelf</span>
+        <span><span class="sw" style="background:var(--limit-c)"></span>past joint limit</span>
+        <span>● current pose · click the map to set it</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="card">
+      <h2>Controls</h2>
+      <div class="checks">
+        <label><input type="checkbox" id="floor"> Floor</label>
+        <label><input type="checkbox" id="shelf"> Shelf</label>
+        <label><input type="checkbox" id="reach" checked> Show reachable area</label>
+      </div>
+      <div class="ctl"><label for="l1">Link 1 length l₁</label><input type="range" id="l1" min="0.4" max="1.6" step="0.05" value="1"><output id="l1o"></output></div>
+      <div class="ctl"><label for="l2">Link 2 length l₂</label><input type="range" id="l2" min="0.4" max="1.6" step="0.05" value="1"><output id="l2o"></output></div>
+      <div class="ctl"><label for="lim">Elbow limit |θ₂| ≤</label><input type="range" id="lim" min="30" max="180" step="5" value="180"><output id="limo"></output></div>
+
+      <div data-panel="fk jac">
+        <div class="ctl"><label for="t1">θ₁ shoulder</label><input type="range" id="t1" min="-180" max="180" step="1" value="30"><output id="t1o"></output></div>
+        <div class="ctl"><label for="t2">θ₂ elbow</label><input type="range" id="t2" min="-180" max="180" step="1" value="60"><output id="t2o"></output></div>
+      </div>
+
+      <div data-panel="ik">
+        <p class="sub">Drag in the task pane to move the green target. Solid arm = the pose you're in; dashed = the other solution.</p>
+        <div class="row">
+          <button id="useA">Go to solution A (elbow +)</button>
+          <button id="useB">Go to solution B (elbow −)</button>
+        </div>
+      </div>
+
+      <div data-panel="jac">
+        <p class="sub">Drag in the task pane to set the desired hand velocity ṗ* (green arrow from the hand).</p>
+        <div class="checks">
+          <label><input type="radio" name="inv" value="plain"> Plain inverse J⁻¹</label>
+          <label><input type="radio" name="inv" value="damped" checked> Damped J⁺</label>
+        </div>
+        <div class="ctl"><label for="lam">Damping λ</label><input type="range" id="lam" min="0.01" max="0.5" step="0.01" value="0.1"><output id="lamo"></output></div>
+        <div class="row"><button id="runJ" class="primary">▶ Run diff-IK</button><button id="resetJ">Reset pose</button></div>
+      </div>
+
+      <div data-panel="fb">
+        <div class="row">
+          <label class="sub" for="path">Target</label>
+          <select id="path">
+            <option value="step">Step (jumps every 3 s)</option>
+            <option value="circle">Circle</option>
+            <option value="sweep">Side-to-side sweep</option>
+            <option value="drag">Drag it yourself</option>
+          </select>
+          <button id="runF" class="primary">⏸ Pause</button>
+          <button id="resetF">Reset</button>
+        </div>
+        <div class="ctl"><label for="kp">Gain k_p (1/s)</label><input type="range" id="kp" min="0" max="120" step="0.5" value="4"><output id="kpo"></output></div>
+        <div class="ctl"><label for="rate">Control rate (Hz)</label><input type="range" id="rate" min="5" max="200" step="1" value="50"><output id="rateo"></output></div>
+        <div class="ctl"><label for="lat">Latency (ms)</label><input type="range" id="lat" min="0" max="200" step="5" value="0"><output id="lato"></output></div>
+        <div class="ctl"><label for="merr">Model error</label><input type="range" id="merr" min="-40" max="40" step="5" value="0"><output id="merro"></output></div>
+        <div class="ctl"><label for="qmax">Joint speed limit</label><input type="range" id="qmax" min="1" max="20" step="0.5" value="8"><output id="qmaxo"></output></div>
+        <div class="checks"><label><input type="checkbox" id="ff" checked> Feed-forward ṗ* (the plan's velocity)</label></div>
+        <canvas id="plot" aria-label="Tracking error over time"></canvas>
+        <div class="sub">Tracking error |Δp| over the last 10 s</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>The math, live</h2>
+      <div class="math" id="math"></div>
+      <div class="try" id="try"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+const rad = (d) => d * Math.PI / 180, deg = (r) => r * 180 / Math.PI;
+const wrap = (a) => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
+const f2 = (x) => (Math.abs(x) < 5e-4 ? 0 : x).toFixed(2);
+const f3 = (x) => (Math.abs(x) < 5e-5 ? 0 : x).toFixed(3);
+const fd = (r) => deg(r).toFixed(0) + "°";
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---------- state ----------
+const S = {
+  tab: "fk", l1: 1, l2: 1, lim: 180, floor: false, shelf: false, showReach: true,
+  q: [rad(30), rad(60)],
+  target: [0.866, 1.5],
+  pdes: [0.4, 0], inv: "damped", lam: 0.1, runJ: false,
+  fb: { kp: 4, rate: 50, lat: 0, merr: 0, qmax: 8, ff: true, path: "step", running: true,
+        t: 0, q: null, qdot: [0, 0], nextCtl: 0, hist: [], qbuf: [], trail: [], drag: [0.5, 1.2], lastHist: 0 },
+};
+const R = () => S.l1 + S.l2;
+
+// ---------- kinematics ----------
+function fk(q, l1 = S.l1, l2 = S.l2) {
+  const e = [l1 * Math.cos(q[0]), l1 * Math.sin(q[0])];
+  const a = q[0] + q[1];
+  return { e, h: [e[0] + l2 * Math.cos(a), e[1] + l2 * Math.sin(a)] };
+}
+function jac(q, l1 = S.l1, l2 = S.l2) {
+  const s1 = Math.sin(q[0]), c1 = Math.cos(q[0]), s12 = Math.sin(q[0] + q[1]), c12 = Math.cos(q[0] + q[1]);
+  return [[-l1 * s1 - l2 * s12, -l2 * s12], [l1 * c1 + l2 * c12, l2 * c12]];
+}
+const det2 = (M) => M[0][0] * M[1][1] - M[0][1] * M[1][0];
+const mv = (M, v) => [M[0][0] * v[0] + M[0][1] * v[1], M[1][0] * v[0] + M[1][1] * v[1]];
+function inv2(M) { const d = det2(M); if (Math.abs(d) < 1e-9) return null; return [[M[1][1] / d, -M[0][1] / d], [-M[1][0] / d, M[0][0] / d]]; }
+function dampedPinv(M, lam) { // J^T (J J^T + λ² I)^-1
+  const JJt = [[M[0][0] ** 2 + M[0][1] ** 2 + lam * lam, M[0][0] * M[1][0] + M[0][1] * M[1][1]],
+               [M[0][0] * M[1][0] + M[0][1] * M[1][1], M[1][0] ** 2 + M[1][1] ** 2 + lam * lam]];
+  const I = inv2(JJt); if (!I) return null;
+  const Jt = [[M[0][0], M[1][0]], [M[0][1], M[1][1]]];
+  return [[Jt[0][0] * I[0][0] + Jt[0][1] * I[1][0], Jt[0][0] * I[0][1] + Jt[0][1] * I[1][1]],
+          [Jt[1][0] * I[0][0] + Jt[1][1] * I[1][0], Jt[1][0] * I[0][1] + Jt[1][1] * I[1][1]]];
+}
+function ik(p, l1 = S.l1, l2 = S.l2) {
+  const r2 = p[0] * p[0] + p[1] * p[1];
+  const c2 = (r2 - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+  if (c2 > 1 + 1e-9 || c2 < -1 - 1e-9) return { r2, c2, sols: [] };
+  const t2 = Math.acos(Math.max(-1, Math.min(1, c2)));
+  const sols = [t2, -t2].map((b) => [wrap(Math.atan2(p[1], p[0]) - Math.atan2(l2 * Math.sin(b), l1 + l2 * Math.cos(b))), b]);
+  return { r2, c2, sols };
+}
+
+// ---------- world / collisions ----------
+const shelfBox = () => ({ x0: 0.33 * R(), x1: 1.05 * R(), y0: 0.52 * R(), y1: 0.6 * R() });
+function segHitsBox(a, b, B) { // Liang–Barsky
+  let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+  const P = [-dx, dx, -dy, dy], Q = [a[0] - B.x0, B.x1 - a[0], a[1] - B.y0, B.y1 - a[1]];
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(P[i]) < 1e-12) { if (Q[i] < 0) return false; }
+    else { const r = Q[i] / P[i]; if (P[i] < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } }
+  }
+  return true;
+}
+// 0 free · 1 floor · 2 shelf · 3 joint limit
+function status(q) {
+  if (Math.abs(deg(q[1])) > S.lim + 1e-6) return 3;
+  const { e, h } = fk(q);
+  if (S.floor && (e[1] < -1e-6 || h[1] < -1e-6)) return 1;
+  if (S.shelf) { const B = shelfBox(); if (segHitsBox([0, 0], e, B) || segHitsBox(e, h, B)) return 2; }
+  return 0;
+}
+const STATUS_TXT = ["free", "hits the floor", "hits the shelf", "past the elbow limit"];
+
+// ---------- canvases ----------
+const task = $("task"), cs = $("cspace"), plot = $("plot");
+const N = 180; // C-space grid resolution (2° cells)
+let csImg = null, reachImg = null, freeGrid = null;
+function fit(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
+}
+// task-space transform: square view of ±1.15 R around the base
+function T(w) { const s = w / (2.3 * R()); return { s, x: (x) => w / 2 + x * s, y: (y) => w / 2 - y * s, inv: (px, py) => [(px - w / 2) / s, (w / 2 - py) / s] }; }
+
+function rebuildWorld() {
+  // C-space image + list of free poses
+  const off = document.createElement("canvas"); off.width = N; off.height = N;
+  const g = off.getContext("2d"), im = g.createImageData(N, N);
+  const cols = [css("--free-c"), css("--floor-c"), css("--shelf-c"), css("--limit-c")].map(hexToRgb);
+  freeGrid = new Uint8Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const q = [rad(-180 + (i + 0.5) * 360 / N), rad(180 - (j + 0.5) * 360 / N)];
+    const st = status(q); freeGrid[j * N + i] = st === 0 ? 1 : 0;
+    const c = cols[st], k = 4 * (j * N + i); im.data[k] = c[0]; im.data[k + 1] = c[1]; im.data[k + 2] = c[2]; im.data[k + 3] = 255;
+  }
+  g.putImageData(im, 0, 0); csImg = off; reachImg = null;
+}
+function hexToRgb(h) {
+  if (h.startsWith("rgb")) return h.match(/\d+/g).slice(0, 3).map(Number);
+  h = h.replace("#", ""); if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+}
+function buildReach(w) { // bins of task space reached by at least one free pose, drawn at uniform tint
+  const B = 140, M = 440, bins = new Uint8Array(B * B), span = 2.3 * R();
+  let seed = 12345; const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) {
+    const q = [rad(-180 + (i + rnd()) * 360 / M), rad(-180 + (j + rnd()) * 360 / M)];
+    if (status(q) !== 0) continue; const h = fk(q).h;
+    const bx = Math.floor((h[0] / span + 0.5) * B), by = Math.floor((0.5 - h[1] / span) * B);
+    if (bx >= 0 && by >= 0 && bx < B && by < B) bins[by * B + bx] = 1;
+  }
+  const off = document.createElement("canvas"); off.width = B; off.height = B;
+  const g = off.getContext("2d"); g.fillStyle = css("--reach");
+  for (let k = 0; k < B * B; k++) if (bins[k]) g.fillRect(k % B, Math.floor(k / B), 1, 1);
+  reachImg = { img: off, w };
+}
+// closest feasible pose to a target (the optimisation form of IK), searched on the C-space grid then refined
+function closestFeasible(p) {
+  let best = null, bd = Infinity;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (!freeGrid[j * N + i]) continue;
+    const q = [rad(-180 + (i + 0.5) * 360 / N), rad(180 - (j + 0.5) * 360 / N)], h = fk(q).h;
+    const d = (h[0] - p[0]) ** 2 + (h[1] - p[1]) ** 2; if (d < bd) { bd = d; best = q; }
+  }
+  if (!best) return null;
+  let step = rad(1); // local refinement
+  for (let it = 0; it < 40; it++) {
+    let improved = false;
+    for (const [a, b] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+      const q = [wrap(best[0] + a), wrap(best[1] + b)]; if (status(q) !== 0) continue;
+      const h = fk(q).h, d = (h[0] - p[0]) ** 2 + (h[1] - p[1]) ** 2; if (d < bd - 1e-12) { bd = d; best = q; improved = true; }
+    }
+    if (!improved) step /= 2;
+  }
+  return { q: best, d: Math.sqrt(bd) };
+}
+
+// ---------- drawing ----------
+function arrow(ctx, x0, y0, x1, y1, color, width = 2.5, head = 9) {
+  const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * head * 0.7, y1 - Math.sin(a) * head * 0.7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - head * Math.cos(a - 0.4), y1 - head * Math.sin(a - 0.4));
+  ctx.lineTo(x1 - head * Math.cos(a + 0.4), y1 - head * Math.sin(a + 0.4)); ctx.closePath(); ctx.fill();
+}
+function drawArm(ctx, t, q, opts = {}) {
+  const { e, h } = fk(q, opts.l1, opts.l2), dash = opts.dash || [];
+  ctx.save(); ctx.setLineDash(dash); ctx.lineCap = "round"; ctx.globalAlpha = opts.alpha ?? 1;
+  ctx.lineWidth = opts.width ?? 7;
+  ctx.strokeStyle = opts.color || css("--link1"); ctx.beginPath(); ctx.moveTo(t.x(0), t.y(0)); ctx.lineTo(t.x(e[0]), t.y(e[1])); ctx.stroke();
+  ctx.strokeStyle = opts.color2 || opts.color || css("--link2"); ctx.beginPath(); ctx.moveTo(t.x(e[0]), t.y(e[1])); ctx.lineTo(t.x(h[0]), t.y(h[1])); ctx.stroke();
+  ctx.setLineDash([]);
+  if (!opts.noJoints) {
+    ctx.fillStyle = css("--panel"); ctx.strokeStyle = css("--joint"); ctx.lineWidth = 2;
+    for (const p of [[0, 0], e]) { ctx.beginPath(); ctx.arc(t.x(p[0]), t.y(p[1]), 5.5, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = css("--joint"); ctx.beginPath(); ctx.arc(t.x(h[0]), t.y(h[1]), 4, 0, 7); ctx.fill();
+  }
+  ctx.restore(); return { e, h };
+}
+function drawAngles(ctx, t, q) {
+  const { e } = fk(q), r1 = 26, r2 = 22;
+  ctx.save(); ctx.lineWidth = 1.5; ctx.font = "12px ui-monospace, Menlo, monospace";
+  // θ1 from +x axis at the base
+  ctx.strokeStyle = css("--link1"); ctx.beginPath(); ctx.arc(t.x(0), t.y(0), r1, 0, -q[0], q[0] > 0); ctx.stroke();
+  ctx.fillStyle = css("--link1"); ctx.fillText("θ₁", t.x(0) + (r1 + 6) * Math.cos(-q[0] / 2), t.y(0) + (r1 + 6) * Math.sin(-q[0] / 2) + 4);
+  // dashed extension of link 1: θ2 is measured from here
+  const ext = [e[0] + 0.45 * S.l2 * Math.cos(q[0]), e[1] + 0.45 * S.l2 * Math.sin(q[0])];
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = css("--ghost"); ctx.beginPath(); ctx.moveTo(t.x(e[0]), t.y(e[1])); ctx.lineTo(t.x(ext[0]), t.y(ext[1])); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = css("--link2"); ctx.beginPath(); ctx.arc(t.x(e[0]), t.y(e[1]), r2, -q[0], -(q[0] + q[1]), q[1] > 0); ctx.stroke();
+  const mid = -(q[0] + q[1] / 2); ctx.fillStyle = css("--link2");
+  ctx.fillText("θ₂", t.x(e[0]) + (r2 + 6) * Math.cos(mid), t.y(e[1]) + (r2 + 6) * Math.sin(mid) + 4);
+  ctx.restore();
+}
+function drawTask() {
+  const { ctx, w } = fit(task), t = T(w), Rr = R();
+  ctx.clearRect(0, 0, w, w); ctx.fillStyle = css("--panel"); ctx.fillRect(0, 0, w, w);
+  // grid (1 unit)
+  ctx.strokeStyle = css("--grid"); ctx.lineWidth = 1;
+  for (let v = -3; v <= 3; v += 0.5) { ctx.beginPath(); ctx.moveTo(t.x(v), 0); ctx.lineTo(t.x(v), w); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, t.y(v)); ctx.lineTo(w, t.y(v)); ctx.stroke(); }
+  // workspace ring
+  if (S.showReach) {
+    if (!reachImg || reachImg.w !== w) buildReach(w);
+    ctx.drawImage(reachImg.img, 0, 0, w, w);
+  }
+  ctx.strokeStyle = css("--ghost"); ctx.setLineDash([3, 5]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(t.x(0), t.y(0), Rr * t.s, 0, 7); ctx.stroke();
+  const rin = Math.abs(S.l1 - S.l2); if (rin > 0.01) { ctx.beginPath(); ctx.arc(t.x(0), t.y(0), rin * t.s, 0, 7); ctx.stroke(); }
+  ctx.setLineDash([]);
+  // floor + shelf
+  if (S.floor) {
+    ctx.fillStyle = css("--floor-c"); ctx.fillRect(0, t.y(0), w, w - t.y(0));
+    ctx.strokeStyle = css("--floor"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, t.y(0)); ctx.lineTo(w, t.y(0)); ctx.stroke();
+  }
+  if (S.shelf) { const B = shelfBox(); ctx.fillStyle = css("--shelf-c"); ctx.strokeStyle = css("--shelf"); ctx.lineWidth = 2;
+    ctx.fillRect(t.x(B.x0), t.y(B.y1), (B.x1 - B.x0) * t.s, (B.y1 - B.y0) * t.s); ctx.strokeRect(t.x(B.x0), t.y(B.y1), (B.x1 - B.x0) * t.s, (B.y1 - B.y0) * t.s); }
+  // base
+  ctx.fillStyle = css("--joint"); ctx.fillRect(t.x(0) - 14, t.y(0), 28, 6);
+
+  const legend = [];
+  const bad = status(S.q) !== 0;
+  if (S.tab === "fk") {
+    const { h } = fk(S.q);
+    ctx.strokeStyle = css("--ghost"); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(h[0]), t.y(0)); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(0), t.y(h[1])); ctx.stroke(); ctx.setLineDash([]);
+    drawArm(ctx, t, S.q, bad ? { color: css("--bad"), color2: css("--bad") } : {});
+    drawAngles(ctx, t, S.q);
+    label(ctx, t.x(h[0]) + 10, t.y(h[1]) - 10, `p = (${f2(h[0])}, ${f2(h[1])})`);
+    legend.push(sw("--link1", "link 1"), sw("--link2", "link 2 (angle θ₁+θ₂)"), "dashed grey = link 1 extended: θ₂ is measured from it");
+  } else if (S.tab === "ik") {
+    const res = ik(S.target), cur = S.q;
+    const valid = res.sols.map((q) => status(q) === 0);
+    res.sols.forEach((q, k) => { if (!sameQ(q, cur)) drawArm(ctx, t, q, { dash: [7, 6], width: 4, alpha: 0.9, color: valid[k] ? css("--ghost") : css("--bad"), noJoints: true }); });
+    let closest = null;
+    if (!valid.some(Boolean)) { closest = closestFeasible(S.target); if (closest) drawArm(ctx, t, closest.q, { dash: [2, 5], width: 4, color: css("--target"), alpha: 0.7, noJoints: true }); }
+    drawArm(ctx, t, cur, bad ? { color: css("--bad"), color2: css("--bad") } : {});
+    crosshair(ctx, t.x(S.target[0]), t.y(S.target[1]), css("--target"));
+    legend.push(sw("--ghost", "other IK solution"), sw("--bad", "blocked solution"), sw("--target", "target / closest feasible pose"));
+  } else if (S.tab === "jac") {
+    drawArm(ctx, t, S.q, bad ? { color: css("--bad"), color2: css("--bad") } : {});
+    const { h } = fk(S.q), J = jac(S.q), k = 0.35 * t.s, hx = t.x(h[0]), hy = t.y(h[1]);
+    // manipulability ellipse: image of the unit circle of joint velocities
+    ctx.strokeStyle = css("--muted"); ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let i = 0; i <= 64; i++) { const a = i / 64 * 2 * Math.PI, v = mv(J, [Math.cos(a), Math.sin(a)]); const X = hx + v[0] * k, Y = hy - v[1] * k; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.stroke();
+    arrow(ctx, hx, hy, hx + J[0][0] * k, hy - J[1][0] * k, css("--link1"), 2.5);
+    arrow(ctx, hx, hy, hx + J[0][1] * k, hy - J[1][1] * k, css("--link2"), 2.5);
+    label(ctx, hx + J[0][0] * k + 6, hy - J[1][0] * k, "∂p/∂θ₁", css("--link1"));
+    label(ctx, hx + J[0][1] * k + 6, hy - J[1][1] * k, "∂p/∂θ₂", css("--link2"));
+    arrow(ctx, hx, hy, hx + S.pdes[0] * t.s, hy - S.pdes[1] * t.s, css("--target"), 3);
+    label(ctx, hx + S.pdes[0] * t.s + 6, hy - S.pdes[1] * t.s + 14, "ṗ*", css("--target"));
+    legend.push(sw("--link1", "column 1: shoulder nudge"), sw("--link2", "column 2: elbow nudge"), "ellipse = every hand velocity from a unit joint speed", sw("--target", "desired ṗ*"));
+  } else if (S.tab === "fb") {
+    const F = S.fb, q = F.q || S.q;
+    if (F.trail.length > 1) { ctx.strokeStyle = css("--link2"); ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5; ctx.beginPath();
+      F.trail.forEach((p, i) => (i ? ctx.lineTo(t.x(p[0]), t.y(p[1])) : ctx.moveTo(t.x(p[0]), t.y(p[1])))); ctx.stroke(); ctx.globalAlpha = 1; }
+    const tp = targetAt(F.t).p, { h } = fk(q);
+    const b = 9; ctx.fillStyle = css("--target"); ctx.globalAlpha = 0.25; ctx.fillRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b); ctx.globalAlpha = 1;
+    ctx.strokeStyle = css("--target"); ctx.lineWidth = 2; ctx.strokeRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b);
+    ctx.strokeStyle = css("--bad"); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(tp[0]), t.y(tp[1])); ctx.stroke(); ctx.setLineDash([]);
+    drawArm(ctx, t, q, status(q) !== 0 ? { color: css("--bad"), color2: css("--bad") } : {});
+    legend.push(sw("--target", "moving target (the box)"), sw("--bad", "Δp = error, or arm in collision"), sw("--link2", "hand trail"));
+  }
+  $("taskLegend").innerHTML = legend.map((x) => `<span>${x}</span>`).join("");
+}
+const sw = (v, txt) => `<span class="sw" style="background:var(${v})"></span>${txt}`;
+function label(ctx, x, y, txt, color) {
+  ctx.save(); ctx.font = "12px ui-monospace, Menlo, monospace"; ctx.fillStyle = color || css("--ink");
+  const W = ctx.canvas.clientWidth, tw = ctx.measureText(txt).width;
+  ctx.fillText(txt, Math.max(4, Math.min(x, W - tw - 4)), Math.max(14, y)); ctx.restore();
+}
+function crosshair(ctx, x, y, c) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.moveTo(x - 14, y); ctx.lineTo(x + 14, y); ctx.moveTo(x, y - 14); ctx.lineTo(x, y + 14); ctx.stroke(); ctx.restore(); }
+const sameQ = (a, b) => Math.abs(wrap(a[0] - b[0])) < rad(1.5) && Math.abs(wrap(a[1] - b[1])) < rad(1.5);
+
+function drawCS() {
+  const { ctx, w } = fit(cs);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(csImg, 0, 0, w, w);
+  const X = (th) => (deg(th) + 180) / 360 * w, Y = (th) => (180 - deg(th)) / 360 * w;
+  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+  for (const d of [-90, 0, 90]) { ctx.beginPath(); ctx.moveTo(X(rad(d)), 0); ctx.lineTo(X(rad(d)), w); ctx.moveTo(0, Y(rad(d))); ctx.lineTo(w, Y(rad(d))); ctx.stroke(); }
+  ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillStyle = css("--muted");
+  ctx.fillText("θ₁ →", w - 38, Y(0) - 5); ctx.fillText("θ₂ ↑", X(0) + 5, 12);
+  for (const d of [-90, 90]) { ctx.fillText(d + "°", X(rad(d)) + 3, w - 5); ctx.fillText(d + "°", 3, Y(rad(d)) - 3); }
+  // singularity lines θ2 = 0 and ±180 (det J = 0) in the Jacobian tab
+  if (S.tab === "jac") { ctx.strokeStyle = css("--bad"); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+    for (const d of [0, -179.5, 179.5]) { ctx.beginPath(); ctx.moveTo(0, Y(rad(d))); ctx.lineTo(w, Y(rad(d))); ctx.stroke(); }
+    ctx.setLineDash([]); ctx.fillStyle = css("--bad"); ctx.fillText("det J = 0", 4, Y(0) + 13); }
+  if (S.tab === "ik") {
+    const res = ik(S.target);
+    res.sols.forEach((q, k) => { const ok = status(q) === 0; ctx.strokeStyle = ok ? css("--target") : css("--bad"); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 8, 0, 7); ctx.stroke(); ctx.fillStyle = ctx.strokeStyle; ctx.fillText(k ? "B" : "A", X(q[0]) + 10, Y(q[1]) - 8); });
+  }
+  if (S.tab === "fb" && S.fb.trail.length) {
+    ctx.strokeStyle = css("--link2"); ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6; ctx.beginPath(); let prev = null;
+    for (const qq of S.fb.qtrail || []) { const x = X(qq[0]), y = Y(qq[1]); if (!prev || Math.abs(x - prev[0]) > w / 2 || Math.abs(y - prev[1]) > w / 2) ctx.moveTo(x, y); else ctx.lineTo(x, y); prev = [x, y]; }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  const q = S.tab === "fb" && S.fb.q ? S.fb.q : S.q;
+  ctx.fillStyle = css("--ink"); ctx.strokeStyle = css("--panel"); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 6, 0, 7); ctx.fill(); ctx.stroke();
+}
+
+// ---------- math panel + try-this ----------
+const TRY = {
+  fk: [
+    "Set θ₁ = 30°, θ₂ = 60°. The hand should read <b>(0.87, 1.50)</b>: that's the worked example in the U2 guide.",
+    "Move only θ₂ and watch the dashed grey line. θ₂ is measured from link 1's extension, not from the ground. That's why link 2's absolute angle is θ₁ + θ₂.",
+    "Make l₂ shorter than l₁: a hole opens in the middle of the dashed circle. The workspace is a ring with inner radius |l₁ − l₂|.",
+    "Click around the right-hand map. Every pixel is a pose, and the whole map is every pose the arm can take.",
+  ],
+  ik: [
+    "Drag the target to about (0.87, 1.50). The two answers are A = (30°, 60°) and B = (90°, −60°). Same hand, two elbows.",
+    "Drag the target outside the dashed circle. There's no exact solution, so the green dotted arm shows the closest reachable pose: the <code>min ‖p(q) − p*‖²</code> form of IK.",
+    "Turn on <b>Floor</b> and drag the target low, close to the base. One solution turns red. On the map, its ring sits in the tan region.",
+    "Turn on <b>Shelf</b> and hunt for a target that's inside the circle but where <i>both</i> solutions are blocked. The floor and shelf carve holes in configuration space, not just task space.",
+  ],
+  jac: [
+    "Look at the two arrows at the hand. Blue (column 1) is perpendicular to the base→hand line. Orange (column 2) is perpendicular to the forearm. Each column is one joint's nudge.",
+    "Slide θ₂ toward 0°. The ellipse flattens into a line and det J → 0: a <b>singularity</b>. On the map it's the red dashed line.",
+    "Set θ₂ ≈ 20°, drag ṗ* to point straight outward along the arm, pick <b>Plain inverse</b> and press Run. Joint speeds spike as the arm straightens. Switch to <b>Damped</b>: it slows down instead of blowing up.",
+    "Check the worked example: θ₁ = 30°, θ₂ = 60°, ṗ* = (0.1, 0) should give q̇ ≈ (0, −0.1). Here the arrow's length is ṗ*; the math panel shows q̇.",
+  ],
+  fb: [
+    "Step target, 50 Hz. Raise k_p from 4 to 30: faster, still smooth (k_p·Δt < 1). Push past 50 (k_p·Δt > 1): overshoot. Past 100 (> 2): unstable chatter, capped only by the joint speed limit. Now drop the control rate to 10 Hz: k_p = 25 already swings wildly. Slow loops can't take high gains.",
+    "Back to 50 Hz and k_p = 30 (smooth by the k_p·Δt rule). Add 60 ms latency: the error jumps from ~0 to swings near 1. A delay of three control ticks is enough. That's the slow shower pipe from field guide §3.3.",
+    "Circle target, k_p = 0 (feed-forward only), model error +30%. The hand drifts off the circle, because open-loop trusts a wrong model. Raise k_p to 5 and it tracks anyway: feedback makes good systems out of imperfect parts.",
+    "Turn on <b>Floor</b> with the sweep target. The controller happily drives the arm through the floor (it turns red). Tracking isn't planning: the course's 'integration' limitation.",
+  ],
+};
+const SRC = {
+  fk: "Course: unit2/3 “Forward Kinematics” · Guide: U2 §2.3",
+  ik: "Course: unit2/3 “Inverse Kinematics”, “The Challenge of Constraints” · Guide: U2 §2.3 checkpoints 2–4",
+  jac: "Course: unit2/4 “Differential Kinematics” · Guide: U2 §2.4 worked example + singularities",
+  fb: "Course: unit2/4 “Adding Feedback Control” · Guide: U2 §2.4 feedback table · Field guide §3.1–3.3",
+};
+function renderMath() {
+  const q = S.tab === "fb" && S.fb.q ? S.fb.q : S.q, { h } = fk(q), st = status(q);
+  const pose = `q = (θ₁, θ₂) = (${fd(q[0])}, ${fd(q[1])})   pose: ${STATUS_TXT[st]}`;
+  let m = "";
+  if (S.tab === "fk") {
+    m = `${pose}\n\np(q) = ( l₁cos θ₁ + l₂cos(θ₁+θ₂) ,  l₁sin θ₁ + l₂sin(θ₁+θ₂) )\n` +
+        `     = ( ${f2(S.l1)}·${f3(Math.cos(q[0]))} + ${f2(S.l2)}·${f3(Math.cos(q[0] + q[1]))} ,  ${f2(S.l1)}·${f3(Math.sin(q[0]))} + ${f2(S.l2)}·${f3(Math.sin(q[0] + q[1]))} )\n` +
+        `     = ( ${f3(h[0])} , ${f3(h[1])} )\n\nreach |p| = ${f3(Math.hypot(h[0], h[1]))}   workspace ring: ${f2(Math.abs(S.l1 - S.l2))} ≤ |p| ≤ ${f2(R())}`;
+  } else if (S.tab === "ik") {
+    const res = ik(S.target), p = S.target;
+    m = `target p* = (${f3(p[0])}, ${f3(p[1])})   r² = ${f3(res.r2)}\n\ncos θ₂ = (r² − l₁² − l₂²) / (2 l₁ l₂) = ${f3(res.c2)}\n`;
+    if (!res.sols.length) {
+      const c = closestFeasible(p);
+      m += `|cos θ₂| > 1  →  no exact solution (out of reach)\n\nclosest feasible pose (min ‖p(q) − p*‖²):\n  q = (${c ? fd(c.q[0]) : "—"}, ${c ? fd(c.q[1]) : "—"})   miss = ${c ? f3(c.d) : "—"}`;
+    } else {
+      m += `θ₁ = atan2(y, x) − atan2(l₂ sin θ₂, l₁ + l₂ cos θ₂)\n\n`;
+      res.sols.forEach((s, k) => { const st2 = status(s); m += `${k ? "B" : "A"}: (${fd(s[0])}, ${fd(s[1])})   ${st2 === 0 ? "✓ valid" : "✗ " + STATUS_TXT[st2]}\n`; });
+      if (!res.sols.some((s) => status(s) === 0)) { const c = closestFeasible(p); m += `\nboth blocked → closest feasible: (${c ? fd(c.q[0]) : "—"}, ${c ? fd(c.q[1]) : "—"}), miss ${c ? f3(c.d) : "—"}`; }
+    }
+  } else if (S.tab === "jac") {
+    const J = jac(q), d = det2(J), Pinv = S.inv === "plain" ? inv2(J) : dampedPinv(J, S.lam);
+    const qd = Pinv ? mv(Pinv, S.pdes) : null, back = qd ? mv(J, qd) : null;
+    const cls = Math.abs(d) < 0.08 ? "bad" : Math.abs(d) < 0.3 ? "warn" : "ok";
+    m = `${pose}\n\nJ(q) = [ ${f3(J[0][0]).padStart(7)}  ${f3(J[0][1]).padStart(7)} ]\n       [ ${f3(J[1][0]).padStart(7)}  ${f3(J[1][1]).padStart(7)} ]\n\n` +
+        `det J = l₁ l₂ sin θ₂ = ${f3(d)}   <span class="pill ${cls}">${cls === "bad" ? "near singular" : cls === "warn" ? "getting close" : "well-conditioned"}</span>\n\n` +
+        `ṗ* = (${f3(S.pdes[0])}, ${f3(S.pdes[1])})\n` +
+        (qd ? `q̇ = ${S.inv === "plain" ? "J⁻¹" : "J⁺(λ=" + S.lam.toFixed(2) + ")"} ṗ* = (${f3(qd[0])}, ${f3(qd[1])}) rad/s\ncheck J q̇ = (${f3(back[0])}, ${f3(back[1])})` + (S.inv === "damped" ? "   (damping trades a little accuracy for sane speeds)" : "")
+            : `q̇ = J⁻¹ ṗ*  →  <span class="pill bad">J is singular: no inverse</span>`);
+  } else if (S.tab === "fb") {
+    const F = S.fb, dt = 1 / F.rate, kd = F.kp * dt, tp = targetAt(F.t).p, err = Math.hypot(tp[0] - h[0], tp[1] - h[1]);
+    const regime = kd < 1 ? ["ok", "smooth approach"] : kd < 2 ? ["warn", "overshoots, then settles"] : ["bad", "unstable"];
+    m = `q̇ = J(q)⁺ ( ${F.ff ? "ṗ*" : "0 "} + k_p Δp ),   Δp = p* − p(q)\n\n` +
+        `k_p = ${F.kp.toFixed(1)} /s   Δt = 1/${F.rate} Hz = ${(dt * 1000).toFixed(1)} ms\n` +
+        `k_p·Δt = ${kd.toFixed(2)}   <span class="pill ${regime[0]}">${regime[1]}</span>` + (F.lat > 0 ? `  + ${F.lat} ms latency: unstable sooner` : "") + `\n` +
+        `model error ${F.merr > 0 ? "+" : ""}${F.merr}% (controller's J uses the wrong link lengths)\n\n|Δp| now = ${f3(err)}\n${pose}`;
+  }
+  $("math").innerHTML = m;
+  $("try").innerHTML = `<h2 style="margin-top:14px">Try this</h2><ol>${TRY[S.tab].map((x) => `<li>${x}</li>`).join("")}</ol><div class="src">${SRC[S.tab]}</div>`;
+}
+
+// ---------- feedback simulation ----------
+function targetAt(t) {
+  const Rr = R(), path = S.fb.path;
+  if (path === "step") { const A = [0.55 * Rr, 0.42 * Rr], B = [-0.3 * Rr, 0.62 * Rr]; return { p: Math.floor(t / 3) % 2 ? B : A, v: [0, 0] }; }
+  if (path === "circle") { const c = [0.25 * Rr, 0.45 * Rr], r = 0.28 * Rr, w = 0.9; return { p: [c[0] + r * Math.cos(w * t), c[1] + r * Math.sin(w * t)], v: [-r * w * Math.sin(w * t), r * w * Math.cos(w * t)] }; }
+  if (path === "sweep") { const w = 0.7, A = 0.75 * Rr; return { p: [A * Math.sin(w * t), 0.12 * Rr], v: [A * w * Math.cos(w * t), 0] }; }
+  return { p: S.fb.drag.slice(), v: [0, 0] };
+}
+function resetFB() {
+  const F = S.fb; F.t = 0; F.q = S.q.slice(); F.qdot = [0, 0]; F.nextCtl = 0; F.hist = []; F.trail = []; F.qtrail = []; F.qbuf = []; F.lastHist = 0;
+}
+const SIM_DT = 0.002;
+function stepFB(realDt) {
+  const F = S.fb; if (!F.q) resetFB();
+  let steps = Math.min(Math.round(realDt / SIM_DT), 60);
+  const lagSteps = Math.round(F.lat / 1000 / SIM_DT), scale = 1 + F.merr / 100;
+  while (steps-- > 0) {
+    F.qbuf.push(F.q.slice()); while (F.qbuf.length > lagSteps + 1) F.qbuf.shift();
+    if (F.t >= F.nextCtl) {
+      const qm = F.qbuf[0];                         // measurement from `lat` ms ago
+      const pm = fk(qm).h;                          // hand measured with the true geometry (e.g. a camera)
+      const tgt = targetAt(F.t);
+      const v = [(F.ff ? tgt.v[0] : 0) + F.kp * (tgt.p[0] - pm[0]), (F.ff ? tgt.v[1] : 0) + F.kp * (tgt.p[1] - pm[1])];
+      const Jm = jac(qm, S.l1 * scale, S.l2 * scale); // controller's model may be wrong
+      const P = dampedPinv(Jm, 0.02);
+      let qd = P ? mv(P, v) : [0, 0];
+      qd = qd.map((x) => Math.max(-F.qmax, Math.min(F.qmax, x)));
+      F.qdot = qd; F.nextCtl += 1 / F.rate;
+    }
+    F.q = [wrap(F.q[0] + F.qdot[0] * SIM_DT), wrap(F.q[1] + F.qdot[1] * SIM_DT)];
+    F.t += SIM_DT;
+    if (F.t - F.lastHist >= 0.02) {
+      F.lastHist = F.t; const h = fk(F.q).h, tp = targetAt(F.t).p;
+      F.hist.push([F.t, Math.hypot(tp[0] - h[0], tp[1] - h[1])]); while (F.hist.length && F.hist[0][0] < F.t - 10) F.hist.shift();
+      F.trail.push(h); if (F.trail.length > 250) F.trail.shift();
+      F.qtrail.push(F.q.slice()); if (F.qtrail.length > 250) F.qtrail.shift();
+    }
+  }
+}
+function drawPlot() {
+  const { ctx, w, h } = fit(plot); ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--chip"); ctx.fillRect(0, 0, w, h);
+  const H = S.fb.hist; if (H.length < 2) return;
+  const t1 = H[H.length - 1][0], t0 = t1 - 10, ymax = Math.max(0.2, ...H.map((p) => Math.min(p[1], 3)));
+  ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.5; ctx.beginPath();
+  H.forEach(([t, e], i) => { const x = (t - t0) / 10 * w, y = h - 4 - Math.min(e, 3) / ymax * (h - 12); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  ctx.fillStyle = css("--muted"); ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillText("max " + ymax.toFixed(2), 4, 12);
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.tab === "jac" && S.runJ) {
+    const J = jac(S.q), P = S.inv === "plain" ? inv2(J) : dampedPinv(J, S.lam);
+    if (!P) { S.runJ = false; syncRunJ(); }
+    else { const qd = mv(P, S.pdes); const big = Math.max(Math.abs(qd[0]), Math.abs(qd[1]));
+      if (big > 60) { S.runJ = false; syncRunJ(); }
+      else { S.q = [wrap(S.q[0] + qd[0] * dt), wrap(S.q[1] + qd[1] * dt)]; syncSliders(); } }
+  }
+  if (S.tab === "fb" && S.fb.running) stepFB(dt);
+  drawTask(); drawCS(); renderMath(); if (S.tab === "fb") drawPlot();
+  requestAnimationFrame(frame);
+}
+
+// ---------- UI wiring ----------
+function syncSliders() { $("t1").value = Math.round(deg(S.q[0])); $("t2").value = Math.round(deg(S.q[1])); outputs(); }
+function outputs() {
+  $("l1o").textContent = S.l1.toFixed(2); $("l2o").textContent = S.l2.toFixed(2); $("limo").textContent = S.lim + "°";
+  $("t1o").textContent = fd(S.q[0]); $("t2o").textContent = fd(S.q[1]); $("lamo").textContent = S.lam.toFixed(2);
+  const F = S.fb; $("kpo").textContent = F.kp.toFixed(1); $("rateo").textContent = F.rate; $("lato").textContent = F.lat;
+  $("merro").textContent = (F.merr > 0 ? "+" : "") + F.merr + "%"; $("qmaxo").textContent = F.qmax.toFixed(1);
+}
+function setTab(tab) {
+  S.tab = tab; document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  document.querySelectorAll("[data-panel]").forEach((el) => el.classList.toggle("hidden", !el.dataset.panel.split(" ").includes(tab)));
+  if (tab !== "jac") { S.runJ = false; syncRunJ(); }
+  if (tab === "fb") resetFB();
+  try { history.replaceState(null, "", "#" + tab); } catch (e) {}
+}
+function syncRunJ() { $("runJ").textContent = S.runJ ? "⏸ Stop" : "▶ Run diff-IK"; }
+document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+const onWorld = () => { rebuildWorld(); };
+$("floor").addEventListener("change", (e) => { S.floor = e.target.checked; onWorld(); });
+$("shelf").addEventListener("change", (e) => { S.shelf = e.target.checked; onWorld(); });
+$("reach").addEventListener("change", (e) => { S.showReach = e.target.checked; });
+$("l1").addEventListener("input", (e) => { S.l1 = +e.target.value; onWorld(); outputs(); });
+$("l2").addEventListener("input", (e) => { S.l2 = +e.target.value; onWorld(); outputs(); });
+$("lim").addEventListener("input", (e) => { S.lim = +e.target.value; onWorld(); outputs(); });
+$("t1").addEventListener("input", (e) => { S.q[0] = rad(+e.target.value); outputs(); });
+$("t2").addEventListener("input", (e) => { S.q[1] = rad(+e.target.value); outputs(); });
+$("lam").addEventListener("input", (e) => { S.lam = +e.target.value; outputs(); });
+document.querySelectorAll("input[name=inv]").forEach((r) => r.addEventListener("change", (e) => { S.inv = e.target.value; }));
+$("useA").addEventListener("click", () => { const s = ik(S.target).sols; if (s[0]) { S.q = s[0].slice(); syncSliders(); } });
+$("useB").addEventListener("click", () => { const s = ik(S.target).sols; if (s[1]) { S.q = s[1].slice(); syncSliders(); } });
+$("runJ").addEventListener("click", () => { S.runJ = !S.runJ; syncRunJ(); });
+$("resetJ").addEventListener("click", () => { S.q = [rad(30), rad(60)]; S.runJ = false; syncRunJ(); syncSliders(); });
+$("runF").addEventListener("click", () => { S.fb.running = !S.fb.running; $("runF").textContent = S.fb.running ? "⏸ Pause" : "▶ Run"; });
+$("resetF").addEventListener("click", resetFB);
+$("path").addEventListener("change", (e) => { S.fb.path = e.target.value; resetFB(); });
+for (const [id, key] of [["kp", "kp"], ["rate", "rate"], ["lat", "lat"], ["merr", "merr"], ["qmax", "qmax"]])
+  $(id).addEventListener("input", (e) => { S.fb[key] = +e.target.value; outputs(); if (key === "rate") S.fb.nextCtl = S.fb.t; });
+$("ff").addEventListener("change", (e) => { S.fb.ff = e.target.checked; });
+$("theme").addEventListener("click", () => {
+  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark"; rebuildWorld();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rebuildWorld);
+
+// pointer on task pane
+function taskPoint(ev) { const r = task.getBoundingClientRect(); return T(r.width).inv(ev.clientX - r.left, ev.clientY - r.top); }
+let dragging = false;
+function onTask(ev) {
+  const p = taskPoint(ev);
+  if (S.tab === "ik") { S.target = p; }
+  else if (S.tab === "jac") { const h = fk(S.q).h; S.pdes = [p[0] - h[0], p[1] - h[1]]; }
+  else if (S.tab === "fb" && S.fb.path === "drag") { S.fb.drag = p; }
+}
+task.addEventListener("pointerdown", (e) => { dragging = true; task.setPointerCapture(e.pointerId); onTask(e); });
+task.addEventListener("pointermove", (e) => { if (dragging) onTask(e); });
+task.addEventListener("pointerup", () => { dragging = false; });
+// pointer on C-space pane
+let csDrag = false;
+function onCS(ev) {
+  if (S.tab === "fb") return; const r = cs.getBoundingClientRect();
+  const u = (ev.clientX - r.left) / r.width, v = (ev.clientY - r.top) / r.height;
+  S.q = [rad(-180 + u * 360), rad(180 - v * 360)].map(wrap); syncSliders();
+}
+cs.addEventListener("pointerdown", (e) => { csDrag = true; cs.setPointerCapture(e.pointerId); onCS(e); });
+cs.addEventListener("pointermove", (e) => { if (csDrag) onCS(e); });
+cs.addEventListener("pointerup", () => { csDrag = false; });
+window.addEventListener("resize", () => { reachImg = null; });
+
+// ---------- boot ----------
+rebuildWorld(); outputs();
+const h0 = (location.hash || "").replace("#", "");
+setTab(["fk", "ik", "jac", "fb"].includes(h0) ? h0 : "fk");
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
