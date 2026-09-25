@@ -4,147 +4,248 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arm Playground</title>
-<meta name="description" content="An interactive two-joint planar arm for Unit 2 of the Hugging Face Robotics Course: forward and inverse kinematics, configuration space, the Jacobian, and feedback control.">
+<meta name="description" content="Interactive two-joint robot arm for Unit 2 of the Hugging Face Robotics Course: forward and inverse kinematics, configuration space with obstacles, the Jacobian, and feedback control, with guided lessons.">
+<meta property="og:title" content="Arm Playground: learn robot kinematics and control by touching it">
+<meta property="og:description" content="FK, IK, configuration space, the Jacobian and feedback control on a two-joint arm, with guided lessons. A companion to Unit 2 of the Hugging Face Robotics Course.">
+<meta property="og:image" content="https://bakulbadwal.github.io/arm-playground/docs/hero.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2315171b'/%3E%3Cpath d='M14 50 L30 34 L50 16' stroke='%236d9df0' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3Cpath d='M30 34 L50 16' stroke='%23f0994f' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='50' r='5' fill='%23fff'/%3E%3Ccircle cx='30' cy='34' r='5' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <style>
 :root {
-  --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1f24; --muted: #62666f; --line: #d9d7cf;
-  --grid: #ecebe5; --link1: #2f6fdb; --link2: #e0751f; --joint: #1d1f24;
-  --target: #1a9b62; --ghost: #9aa0aa; --bad: #d23c3c; --ok: #1a9b62; --warn: #c98a00;
-  --floor: #8a7a66; --floor-c: #e5d6c1; --shelf: #6d5bd0; --shelf-c: #d9d2f7; --limit-c: #e4e4e4;
-  --reach: rgba(47,111,219,0.10); --free-c: #ffffff; --accent: #2f6fdb; --chip: #eef2fb;
+  --bg: #f5f4ef; --panel: #ffffff; --panel-2: #fafaf7; --ink: #1b1d22; --muted: #5f636c; --line: #dddbd2;
+  --grid: #efeee8; --link1: #2f6fdb; --link2: #e0751f; --joint: #1b1d22;
+  --target: #16925b; --ghost: #9aa0aa; --bad: #d23c3c; --ok: #16925b; --warn: #b87d00;
+  --floor: #8a7a66; --floor-c: #eadcc6; --shelf: #6d5bd0; --shelf-c: #dcd5f8; --limit-c: #e2e2e2;
+  --reach: rgba(47,111,219,0.10); --free-c: #ffffff; --accent: #2f6fdb; --chip: #f0f3fa;
+  --basinA: rgba(22,146,91,0.30); --basinB: rgba(109,91,208,0.30); --basinX: rgba(120,120,120,0.18);
+  --shadow: 0 1px 2px rgba(20,20,30,0.05), 0 6px 24px rgba(20,20,30,0.05);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #15171b; --panel: #1d2026; --ink: #e8e9ec; --muted: #a0a5ae; --line: #343841;
-    --grid: #262a31; --link1: #6d9df0; --link2: #f0994f; --joint: #e8e9ec;
-    --target: #38c98a; --ghost: #6c727c; --bad: #ef6464; --ok: #38c98a; --warn: #e3b341;
-    --floor: #b7a58d; --floor-c: #4a4034; --shelf: #a597f5; --shelf-c: #3b3560; --limit-c: #30333a;
-    --reach: rgba(109,157,240,0.14); --free-c: #1d2026; --accent: #6d9df0; --chip: #232a38;
+    --bg: #121418; --panel: #1b1e24; --panel-2: #171a1f; --ink: #e9eaed; --muted: #a2a7b0; --line: #30343d;
+    --grid: #23272e; --link1: #6d9df0; --link2: #f0994f; --joint: #e9eaed;
+    --target: #3ccb8d; --ghost: #6c727c; --bad: #f06a6a; --ok: #3ccb8d; --warn: #e3b341;
+    --floor: #b7a58d; --floor-c: #463c30; --shelf: #a597f5; --shelf-c: #37315c; --limit-c: #2c2f36;
+    --reach: rgba(109,157,240,0.13); --free-c: #1b1e24; --accent: #7aa7f5; --chip: #20252f;
+    --basinA: rgba(60,203,141,0.28); --basinB: rgba(165,151,245,0.30); --basinX: rgba(160,160,160,0.14);
+    --shadow: none;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #15171b; --panel: #1d2026; --ink: #e8e9ec; --muted: #a0a5ae; --line: #343841;
-  --grid: #262a31; --link1: #6d9df0; --link2: #f0994f; --joint: #e8e9ec;
-  --target: #38c98a; --ghost: #6c727c; --bad: #ef6464; --ok: #38c98a; --warn: #e3b341;
-  --floor: #b7a58d; --floor-c: #4a4034; --shelf: #a597f5; --shelf-c: #3b3560; --limit-c: #30333a;
-  --reach: rgba(109,157,240,0.14); --free-c: #1d2026; --accent: #6d9df0; --chip: #232a38;
+  --bg: #121418; --panel: #1b1e24; --panel-2: #171a1f; --ink: #e9eaed; --muted: #a2a7b0; --line: #30343d;
+  --grid: #23272e; --link1: #6d9df0; --link2: #f0994f; --joint: #e9eaed;
+  --target: #3ccb8d; --ghost: #6c727c; --bad: #f06a6a; --ok: #3ccb8d; --warn: #e3b341;
+  --floor: #b7a58d; --floor-c: #463c30; --shelf: #a597f5; --shelf-c: #37315c; --limit-c: #2c2f36;
+  --reach: rgba(109,157,240,0.13); --free-c: #1b1e24; --accent: #7aa7f5; --chip: #20252f;
+  --basinA: rgba(60,203,141,0.28); --basinB: rgba(165,151,245,0.30); --basinX: rgba(160,160,160,0.14);
+  --shadow: none;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
-.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; }
-header h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -0.01em; }
-header p { margin: 0; color: var(--muted); max-width: 760px; }
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 22px 16px 40px; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
-button, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; padding: 6px 12px; cursor: pointer; }
-button:hover { border-color: var(--accent); }
+.brand h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+.brand .kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.brand p { margin: 4px 0 0; color: var(--muted); max-width: 780px; }
+.actions { display: flex; gap: 8px; }
+button, select { font: inherit; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 9px; padding: 6px 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+button:hover, select:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-nav.tabs { display: flex; gap: 6px; margin: 16px 0 12px; flex-wrap: wrap; }
-nav.tabs button { border-radius: 999px; }
+button.ghost { background: transparent; }
+nav.tabs { display: flex; gap: 6px; margin: 18px 0 10px; flex-wrap: wrap; }
+nav.tabs button { border-radius: 999px; padding: 7px 14px; }
 nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.eq { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.eqc { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; box-shadow: var(--shadow); min-width: 0; }
+.eqc .tex { font-size: 16px; overflow-x: auto; overflow-y: hidden; }
+.eqc .gloss { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
-.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
-canvas { display: block; width: 100%; aspect-ratio: 1 / 1; touch-action: none; border-radius: 8px; }
-.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
-.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--line); }
-.lower { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; margin-top: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; box-shadow: var(--shadow); position: relative; }
+.card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 8px; font-weight: 650; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+canvas { display: block; width: 100%; aspect-ratio: 1 / 1; touch-action: none; border-radius: 10px; }
+.legend { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font: 12px ui-monospace, Menlo, monospace;
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 2; opacity: 0.92; }
+.lower { display: grid; grid-template-columns: 1fr 1.15fr; gap: 14px; margin-top: 14px; align-items: start; }
+.stack { display: grid; gap: 14px; min-width: 0; }
 .ctl { display: grid; grid-template-columns: 150px 1fr 64px; gap: 6px 10px; align-items: center; margin-bottom: 4px; }
 .ctl label { font-size: 13px; color: var(--muted); }
 .ctl output { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
-.checks { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 14px; }
+.checks { display: flex; gap: 8px 16px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 14px; }
 .checks label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
-.math { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; line-height: 1.65;
-  background: var(--chip); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
-.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.sub { font-size: 12.5px; color: var(--muted); margin: 4px 0; }
+.sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+.math { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.7;
+  background: var(--chip); border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 650; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
 .pill.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .pill.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
 .pill.bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
-.try ol { margin: 0; padding-left: 20px; }
-.try li { margin-bottom: 6px; }
-.try .src { color: var(--muted); font-size: 12px; margin-top: 8px; }
 .hidden { display: none !important; }
 #plot { aspect-ratio: 4 / 1; margin-top: 8px; }
-.sub { font-size: 12px; color: var(--muted); }
-kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-@media (max-width: 860px) {
+#bars { aspect-ratio: 5 / 1; margin-top: 6px; }
+.pad { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(2, 34px); gap: 4px; }
+.pad button { padding: 0; }
+.pad .up { grid-column: 2; } .pad .left { grid-column: 1; grid-row: 2; } .pad .down { grid-column: 2; grid-row: 2; } .pad .right { grid-column: 3; grid-row: 2; }
+/* lesson */
+.lesson { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.lesson h3 { font-size: 18px; margin: 2px 0 6px; letter-spacing: -0.01em; }
+.dots { display: flex; gap: 5px; }
+.dots button { width: 22px; height: 6px; padding: 0; border-radius: 3px; background: var(--line); border: 0; }
+.dots button.done { background: color-mix(in srgb, var(--ok) 70%, transparent); }
+.dots button.cur { background: var(--accent); }
+.lbody { font-size: 15px; }
+.lbody p { margin: 0 0 8px; }
+.ask { background: var(--panel-2); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+.ask .q { font-weight: 600; margin-bottom: 8px; }
+.ask input[type=number] { font: inherit; width: 110px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.ask .opts { display: grid; gap: 6px; }
+.ask .opts button { text-align: left; }
+.ask .opts button.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--panel)); }
+.ask .opts button.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); }
+.fb { margin-top: 8px; font-size: 14px; }
+.fb.good { color: var(--ok); } .fb.no { color: var(--bad); }
+.fb .why { color: var(--ink); display: block; margin-top: 4px; }
+details.more { margin-top: 10px; font-size: 14px; }
+details.more summary { cursor: pointer; color: var(--muted); }
+details.more ol { padding-left: 20px; margin: 8px 0 0; }
+details.more li { margin-bottom: 6px; }
+kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; background: var(--panel-2); }
+footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 14px; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 9px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 0.95; }
+@media (max-width: 900px) {
   .panes, .lower { grid-template-columns: 1fr; }
   .ctl { grid-template-columns: 118px 1fr 56px; }
+  .eqc .tex { font-size: 14px; }
 }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
-    <header>
+    <div class="brand">
+      <div class="kicker">Companion to the <a href="https://huggingface.co/learn/robotics-course" target="_blank" rel="noopener">Hugging Face Robotics Course</a> · Unit 2</div>
       <h1>Arm Playground</h1>
-      <p>A two-joint planar arm (the course's simplified SO-100) for Unit 2 of the Hugging Face Robotics Course. The left pane is <b>task space</b>, where the hand is. The right pane is <b>configuration space</b>: every pixel is one pair of joint angles (θ₁, θ₂).</p>
-    </header>
-    <button id="theme" title="Toggle light/dark">◐ Theme</button>
+      <p>Robot kinematics and control on the course's two-joint arm. <b>Left:</b> task space, where the hand is. <b>Right:</b> configuration space, where every pixel is one pair of joint angles (θ₁, θ₂). Follow the lesson on each tab, or just play.</p>
+    </div>
+    <div class="actions">
+      <button id="copy" title="Copy a link to exactly this setup">🔗 Copy link</button>
+      <button id="theme" title="Toggle light/dark">◐</button>
+    </div>
   </div>
 
-  <nav class="tabs" role="tablist">
+  <nav class="tabs" role="tablist" aria-label="Topics">
     <button role="tab" data-tab="fk">1 · Forward kinematics</button>
     <button role="tab" data-tab="ik">2 · Inverse kinematics</button>
     <button role="tab" data-tab="jac">3 · Jacobian &amp; diff-IK</button>
     <button role="tab" data-tab="fb">4 · Feedback control</button>
   </nav>
 
+  <div class="eq" id="eq"></div>
+
   <div class="panes">
     <section class="card">
-      <h2>Task space: where the hand is</h2>
+      <h2><span>Task space · where the hand is</span><span id="taskStatus"></span></h2>
       <canvas id="task" aria-label="Task space view of the arm"></canvas>
       <div class="legend" id="taskLegend"></div>
     </section>
-    <section class="card">
-      <h2>Configuration space: (θ₁, θ₂)</h2>
-      <canvas id="cspace" aria-label="Configuration space map"></canvas>
+    <section class="card" id="csCard">
+      <h2><span>Configuration space · (θ₁, θ₂)</span>
+        <label class="sub" id="basinWrap" style="margin:0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="basins"> Basins of iterative IK</label></h2>
+      <canvas id="cspace" aria-label="Configuration space map: click to set the pose, hover to preview"></canvas>
+      <div class="tip hidden" id="tip"></div>
       <div class="legend">
         <span><span class="sw" style="background:var(--free-c)"></span>free</span>
         <span><span class="sw" style="background:var(--floor-c)"></span>hits floor</span>
         <span><span class="sw" style="background:var(--shelf-c)"></span>hits shelf</span>
-        <span><span class="sw" style="background:var(--limit-c)"></span>past joint limit</span>
-        <span>● current pose · click the map to set it</span>
+        <span><span class="sw" style="background:var(--limit-c)"></span>past elbow limit</span>
+        <span id="basinLegend" class="hidden"><span class="sw" style="background:var(--basinA)"></span>→ A <span class="sw" style="background:var(--basinB);margin-left:6px"></span>→ B</span>
+        <span>hover = preview · click = go there</span>
       </div>
     </section>
   </div>
 
   <div class="lower">
+    <div class="stack">
+      <section class="card lesson" id="lesson" aria-live="polite">
+        <h2><span>Lesson · <span id="lsTab"></span></span><span id="lsCount"></span></h2>
+        <div class="dots" id="lsDots"></div>
+        <h3 id="lsTitle"></h3>
+        <div class="lbody" id="lsBody"></div>
+        <div id="lsAsk"></div>
+        <div class="row">
+          <button id="lsPrev">← Back</button>
+          <button id="lsSetup" class="ghost" title="Put the arm back to this step's starting setup">↺ Reset this step</button>
+          <button id="lsNext" class="primary">Next →</button>
+        </div>
+        <details class="more"><summary>More experiments for free play</summary><ol id="more"></ol></details>
+      </section>
+      <section class="card">
+        <h2>The math, live</h2>
+        <div class="math" id="math"></div>
+        <div data-panel="fb">
+          <div class="sub" style="margin-top:10px"><b>Discrete-time error</b>: e<sub>k+1</sub> = e<sub>k</sub> − k<sub>p</sub>Δt · e<sub>k−d</sub> (d = latency in ticks), starting from a unit step</div>
+          <canvas id="bars" aria-label="Discrete error sequence"></canvas>
+        </div>
+      </section>
+    </div>
+
     <section class="card">
       <h2>Controls</h2>
       <div class="checks">
         <label><input type="checkbox" id="floor"> Floor</label>
         <label><input type="checkbox" id="shelf"> Shelf</label>
-        <label><input type="checkbox" id="reach" checked> Show reachable area</label>
+        <label><input type="checkbox" id="reach" checked> Reachable area</label>
       </div>
       <div class="ctl"><label for="l1">Link 1 length l₁</label><input type="range" id="l1" min="0.4" max="1.6" step="0.05" value="1"><output id="l1o"></output></div>
       <div class="ctl"><label for="l2">Link 2 length l₂</label><input type="range" id="l2" min="0.4" max="1.6" step="0.05" value="1"><output id="l2o"></output></div>
       <div class="ctl"><label for="lim">Elbow limit |θ₂| ≤</label><input type="range" id="lim" min="30" max="180" step="5" value="180"><output id="limo"></output></div>
+      <hr class="sep">
 
-      <div data-panel="fk jac">
+      <div data-panel="fk jac ik">
         <div class="ctl"><label for="t1">θ₁ shoulder</label><input type="range" id="t1" min="-180" max="180" step="1" value="30"><output id="t1o"></output></div>
         <div class="ctl"><label for="t2">θ₂ elbow</label><input type="range" id="t2" min="-180" max="180" step="1" value="60"><output id="t2o"></output></div>
       </div>
 
       <div data-panel="ik">
-        <p class="sub">Drag in the task pane to move the green target. Solid arm = the pose you're in; dashed = the other solution.</p>
+        <p class="sub">Drag in the task pane to move the green target.</p>
         <div class="row">
-          <button id="useA">Go to solution A (elbow +)</button>
-          <button id="useB">Go to solution B (elbow −)</button>
+          <button id="useA">Jump to A (θ₂ +)</button>
+          <button id="useB">Jump to B (θ₂ −)</button>
+          <button id="solve" class="primary">▶ Solve iteratively</button>
         </div>
+        <p class="sub">Iterative IK starts from the <i>current</i> pose and steps downhill on ‖p(q) − p*‖² using the damped Jacobian. It ignores obstacles, just like a bare solver.</p>
       </div>
 
       <div data-panel="jac">
-        <p class="sub">Drag in the task pane to set the desired hand velocity ṗ* (green arrow from the hand).</p>
+        <div class="row">
+          <button id="wig1">〰 Wiggle shoulder</button>
+          <button id="wig2">〰 Wiggle elbow</button>
+        </div>
+        <p class="sub">Drag in the task pane to set the desired hand velocity ṗ* (green arrow).</p>
         <div class="checks">
           <label><input type="radio" name="inv" value="plain"> Plain inverse J⁻¹</label>
           <label><input type="radio" name="inv" value="damped" checked> Damped J⁺</label>
         </div>
         <div class="ctl"><label for="lam">Damping λ</label><input type="range" id="lam" min="0.01" max="0.5" step="0.01" value="0.1"><output id="lamo"></output></div>
         <div class="row"><button id="runJ" class="primary">▶ Run diff-IK</button><button id="resetJ">Reset pose</button></div>
+        <div class="row" style="align-items:flex-start;gap:14px">
+          <div class="pad" aria-label="Teleop pad">
+            <button class="up" data-k="up" aria-label="Hand up">↑</button><button class="left" data-k="left" aria-label="Hand left">←</button>
+            <button class="down" data-k="down" aria-label="Hand down">↓</button><button class="right" data-k="right" aria-label="Hand right">→</button>
+          </div>
+          <p class="sub" style="max-width:260px"><b>Teleop:</b> hold the pad or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to drive the hand. Diff-IK converts each command into joint speeds.</p>
+        </div>
       </div>
 
       <div data-panel="fb">
@@ -166,44 +267,48 @@ kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--line); bord
         <div class="ctl"><label for="qmax">Joint speed limit</label><input type="range" id="qmax" min="1" max="20" step="0.5" value="8"><output id="qmaxo"></output></div>
         <div class="checks"><label><input type="checkbox" id="ff" checked> Feed-forward ṗ* (the plan's velocity)</label></div>
         <canvas id="plot" aria-label="Tracking error over time"></canvas>
-        <div class="sub">Tracking error |Δp| over the last 10 s</div>
+        <div class="sub">Tracking error |Δp| over the last 10 s (dashed = target switches)</div>
       </div>
     </section>
-
-    <section class="card">
-      <h2>The math, live</h2>
-      <div class="math" id="math"></div>
-      <div class="try" id="try"></div>
-    </section>
   </div>
+
+  <footer>
+    <span>Unofficial companion to <a href="https://huggingface.co/learn/robotics-course/unit2/1" target="_blank" rel="noopener">Unit 2 · Classical Robotics</a> of the Hugging Face Robotics Course. Not affiliated with Hugging Face.</span>
+    <span>MIT License · <a href="https://github.com/bakulbadwal/arm-playground" target="_blank" rel="noopener">Source on GitHub</a></span>
+  </footer>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
 "use strict";
-// ---------- helpers ----------
+// ================= helpers =================
 const $ = (id) => document.getElementById(id);
 const rad = (d) => d * Math.PI / 180, deg = (r) => r * 180 / Math.PI;
 const wrap = (a) => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
 const f2 = (x) => (Math.abs(x) < 5e-4 ? 0 : x).toFixed(2);
 const f3 = (x) => (Math.abs(x) < 5e-5 ? 0 : x).toFixed(3);
 const fd = (r) => deg(r).toFixed(0) + "°";
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+let cssCache = {};
+const css = (name) => (cssCache[name] ??= getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+const store = { get(k, d) { try { const v = localStorage.getItem("armpg:" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem("armpg:" + k, JSON.stringify(v)); } catch (e) {} } };
 
-// ---------- state ----------
+// ================= state =================
 const S = {
-  tab: "fk", l1: 1, l2: 1, lim: 180, floor: false, shelf: false, showReach: true,
-  q: [rad(30), rad(60)],
-  target: [0.866, 1.5],
-  pdes: [0.4, 0], inv: "damped", lam: 0.1, runJ: false,
+  tab: "fk", l1: 1, l2: 1, lim: 180, floor: false, shelf: false, showReach: true, basins: false,
+  q: [rad(30), rad(60)], target: [0.866, 1.5],
+  pdes: [0.1, 0], inv: "damped", lam: 0.1, runJ: false, keys: {},
+  anim: null, wiggle: null, iter: null, hoverQ: null,
   fb: { kp: 4, rate: 50, lat: 0, merr: 0, qmax: 8, ff: true, path: "step", running: true,
-        t: 0, q: null, qdot: [0, 0], nextCtl: 0, hist: [], qbuf: [], trail: [], drag: [0.5, 1.2], lastHist: 0 },
+        t: 0, q: null, qdot: [0, 0], nextCtl: 0, hist: [], qbuf: [], trail: [], qtrail: [], drag: [0.5, 1.2], lastHist: 0,
+        stepInfo: null, lastStep: null, switches: [] },
 };
 const R = () => S.l1 + S.l2;
 
-// ---------- kinematics ----------
+// ================= kinematics =================
 function fk(q, l1 = S.l1, l2 = S.l2) {
-  const e = [l1 * Math.cos(q[0]), l1 * Math.sin(q[0])];
-  const a = q[0] + q[1];
+  const e = [l1 * Math.cos(q[0]), l1 * Math.sin(q[0])], a = q[0] + q[1];
   return { e, h: [e[0] + l2 * Math.cos(a), e[1] + l2 * Math.sin(a)] };
 }
 function jac(q, l1 = S.l1, l2 = S.l2) {
@@ -213,24 +318,20 @@ function jac(q, l1 = S.l1, l2 = S.l2) {
 const det2 = (M) => M[0][0] * M[1][1] - M[0][1] * M[1][0];
 const mv = (M, v) => [M[0][0] * v[0] + M[0][1] * v[1], M[1][0] * v[0] + M[1][1] * v[1]];
 function inv2(M) { const d = det2(M); if (Math.abs(d) < 1e-9) return null; return [[M[1][1] / d, -M[0][1] / d], [-M[1][0] / d, M[0][0] / d]]; }
-function dampedPinv(M, lam) { // J^T (J J^T + λ² I)^-1
-  const JJt = [[M[0][0] ** 2 + M[0][1] ** 2 + lam * lam, M[0][0] * M[1][0] + M[0][1] * M[1][1]],
-               [M[0][0] * M[1][0] + M[0][1] * M[1][1], M[1][0] ** 2 + M[1][1] ** 2 + lam * lam]];
-  const I = inv2(JJt); if (!I) return null;
-  const Jt = [[M[0][0], M[1][0]], [M[0][1], M[1][1]]];
-  return [[Jt[0][0] * I[0][0] + Jt[0][1] * I[1][0], Jt[0][0] * I[0][1] + Jt[0][1] * I[1][1]],
-          [Jt[1][0] * I[0][0] + Jt[1][1] * I[1][0], Jt[1][0] * I[0][1] + Jt[1][1] * I[1][1]]];
+function dampedPinv(M, lam) { // Jᵀ (J Jᵀ + λ² I)⁻¹
+  const a = M[0][0], b = M[0][1], c = M[1][0], d = M[1][1];
+  const I = inv2([[a * a + b * b + lam * lam, a * c + b * d], [a * c + b * d, c * c + d * d + lam * lam]]); if (!I) return null;
+  return [[a * I[0][0] + c * I[1][0], a * I[0][1] + c * I[1][1]], [b * I[0][0] + d * I[1][0], b * I[0][1] + d * I[1][1]]];
 }
 function ik(p, l1 = S.l1, l2 = S.l2) {
-  const r2 = p[0] * p[0] + p[1] * p[1];
-  const c2 = (r2 - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+  const r2 = p[0] * p[0] + p[1] * p[1], c2 = (r2 - l1 * l1 - l2 * l2) / (2 * l1 * l2);
   if (c2 > 1 + 1e-9 || c2 < -1 - 1e-9) return { r2, c2, sols: [] };
-  const t2 = Math.acos(Math.max(-1, Math.min(1, c2)));
-  const sols = [t2, -t2].map((b) => [wrap(Math.atan2(p[1], p[0]) - Math.atan2(l2 * Math.sin(b), l1 + l2 * Math.cos(b))), b]);
-  return { r2, c2, sols };
+  const t2 = Math.acos(clamp(c2, -1, 1));
+  return { r2, c2, sols: [t2, -t2].map((b) => [wrap(Math.atan2(p[1], p[0]) - Math.atan2(l2 * Math.sin(b), l1 + l2 * Math.cos(b))), b]) };
 }
+const sameQ = (a, b, tol = 1.5) => Math.abs(wrap(a[0] - b[0])) < rad(tol) && Math.abs(wrap(a[1] - b[1])) < rad(tol);
 
-// ---------- world / collisions ----------
+// ================= world / collisions =================
 const shelfBox = () => ({ x0: 0.33 * R(), x1: 1.05 * R(), y0: 0.52 * R(), y1: 0.6 * R() });
 function segHitsBox(a, b, B) { // Liang–Barsky
   let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
@@ -241,8 +342,7 @@ function segHitsBox(a, b, B) { // Liang–Barsky
   }
   return true;
 }
-// 0 free · 1 floor · 2 shelf · 3 joint limit
-function status(q) {
+function status(q) { // 0 free · 1 floor · 2 shelf · 3 joint limit
   if (Math.abs(deg(q[1])) > S.lim + 1e-6) return 3;
   const { e, h } = fk(q);
   if (S.floor && (e[1] < -1e-6 || h[1] < -1e-6)) return 1;
@@ -251,20 +351,16 @@ function status(q) {
 }
 const STATUS_TXT = ["free", "hits the floor", "hits the shelf", "past the elbow limit"];
 
-// ---------- canvases ----------
-const task = $("task"), cs = $("cspace"), plot = $("plot");
-const N = 180; // C-space grid resolution (2° cells)
-let csImg = null, reachImg = null, freeGrid = null;
-function fit(c) {
-  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
-  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-  const ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
+// ================= precomputed layers =================
+const N = 180;
+let csImg = null, reachImg = null, freeGrid = null, basinImg = null, basinKey = "";
+function hexToRgb(h) {
+  if (h.startsWith("rgb")) return h.match(/[\d.]+/g).slice(0, 3).map(Number);
+  h = h.replace("#", ""); if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
 }
-// task-space transform: square view of ±1.15 R around the base
-function T(w) { const s = w / (2.3 * R()); return { s, x: (x) => w / 2 + x * s, y: (y) => w / 2 - y * s, inv: (px, py) => [(px - w / 2) / s, (w / 2 - py) / s] }; }
-
 function rebuildWorld() {
-  // C-space image + list of free poses
+  cssCache = {};
   const off = document.createElement("canvas"); off.width = N; off.height = N;
   const g = off.getContext("2d"), im = g.createImageData(N, N);
   const cols = [css("--free-c"), css("--floor-c"), css("--shelf-c"), css("--limit-c")].map(hexToRgb);
@@ -274,14 +370,9 @@ function rebuildWorld() {
     const st = status(q); freeGrid[j * N + i] = st === 0 ? 1 : 0;
     const c = cols[st], k = 4 * (j * N + i); im.data[k] = c[0]; im.data[k + 1] = c[1]; im.data[k + 2] = c[2]; im.data[k + 3] = 255;
   }
-  g.putImageData(im, 0, 0); csImg = off; reachImg = null;
+  g.putImageData(im, 0, 0); csImg = off; reachImg = null; basinKey = "";
 }
-function hexToRgb(h) {
-  if (h.startsWith("rgb")) return h.match(/\d+/g).slice(0, 3).map(Number);
-  h = h.replace("#", ""); if (h.length === 3) h = h.split("").map((c) => c + c).join("");
-  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
-}
-function buildReach(w) { // bins of task space reached by at least one free pose, drawn at uniform tint
+function buildReach(w) {
   const B = 140, M = 440, bins = new Uint8Array(B * B), span = 2.3 * R();
   let seed = 12345; const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) {
@@ -295,7 +386,26 @@ function buildReach(w) { // bins of task space reached by at least one free pose
   for (let k = 0; k < B * B; k++) if (bins[k]) g.fillRect(k % B, Math.floor(k / B), 1, 1);
   reachImg = { img: off, w };
 }
-// closest feasible pose to a target (the optimisation form of IK), searched on the C-space grid then refined
+// one iterative-IK step: damped least squares, step length capped
+function ikStep(q, p) {
+  const h = fk(q).h, err = [p[0] - h[0], p[1] - h[1]], P = dampedPinv(jac(q), 0.15);
+  let dq = mv(P, err).map((x) => 0.6 * x); const n = Math.hypot(dq[0], dq[1]); if (n > 0.2) dq = dq.map((x) => x * 0.2 / n);
+  return { q: [wrap(q[0] + dq[0]), wrap(q[1] + dq[1])], err: Math.hypot(err[0], err[1]) };
+}
+function buildBasins() {
+  const key = [S.target[0].toFixed(3), S.target[1].toFixed(3), S.l1, S.l2].join(",");
+  if (key === basinKey && basinImg) return; if (dragging && basinImg) return; basinKey = key;
+  const M = 120, off = document.createElement("canvas"); off.width = M; off.height = M;
+  const g = off.getContext("2d"), sols = ik(S.target).sols;
+  const cA = css("--basinA"), cB = css("--basinB"), cX = css("--basinX");
+  for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) {
+    let q = [rad(-180 + (i + 0.5) * 360 / M), rad(180 - (j + 0.5) * 360 / M)];
+    for (let k = 0; k < 70; k++) q = ikStep(q, S.target).q;
+    let c = cX; if (sols.length) { if (sameQ(q, sols[0], 4)) c = cA; else if (sameQ(q, sols[1], 4)) c = cB; }
+    g.fillStyle = c; g.fillRect(i, j, 1, 1);
+  }
+  basinImg = off;
+}
 function closestFeasible(p) {
   let best = null, bd = Infinity;
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -304,7 +414,7 @@ function closestFeasible(p) {
     const d = (h[0] - p[0]) ** 2 + (h[1] - p[1]) ** 2; if (d < bd) { bd = d; best = q; }
   }
   if (!best) return null;
-  let step = rad(1); // local refinement
+  let step = rad(1);
   for (let it = 0; it < 40; it++) {
     let improved = false;
     for (const [a, b] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
@@ -315,225 +425,275 @@ function closestFeasible(p) {
   }
   return { q: best, d: Math.sqrt(bd) };
 }
-
-// ---------- drawing ----------
-function arrow(ctx, x0, y0, x1, y1, color, width = 2.5, head = 9) {
-  const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * head * 0.7, y1 - Math.sin(a) * head * 0.7); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - head * Math.cos(a - 0.4), y1 - head * Math.sin(a - 0.4));
-  ctx.lineTo(x1 - head * Math.cos(a + 0.4), y1 - head * Math.sin(a + 0.4)); ctx.closePath(); ctx.fill();
+let cfCache = { key: "", val: null };
+function closestCached(p) {
+  const key = [p[0].toFixed(3), p[1].toFixed(3), S.l1, S.l2, S.floor, S.shelf, S.lim].join(",");
+  if (cfCache.key !== key) cfCache = { key, val: closestFeasible(p) };
+  return cfCache.val;
 }
-function drawArm(ctx, t, q, opts = {}) {
-  const { e, h } = fk(q, opts.l1, opts.l2), dash = opts.dash || [];
-  ctx.save(); ctx.setLineDash(dash); ctx.lineCap = "round"; ctx.globalAlpha = opts.alpha ?? 1;
-  ctx.lineWidth = opts.width ?? 7;
-  ctx.strokeStyle = opts.color || css("--link1"); ctx.beginPath(); ctx.moveTo(t.x(0), t.y(0)); ctx.lineTo(t.x(e[0]), t.y(e[1])); ctx.stroke();
-  ctx.strokeStyle = opts.color2 || opts.color || css("--link2"); ctx.beginPath(); ctx.moveTo(t.x(e[0]), t.y(e[1])); ctx.lineTo(t.x(h[0]), t.y(h[1])); ctx.stroke();
-  ctx.setLineDash([]);
-  if (!opts.noJoints) {
-    ctx.fillStyle = css("--panel"); ctx.strokeStyle = css("--joint"); ctx.lineWidth = 2;
-    for (const p of [[0, 0], e]) { ctx.beginPath(); ctx.arc(t.x(p[0]), t.y(p[1]), 5.5, 0, 7); ctx.fill(); ctx.stroke(); }
-    ctx.fillStyle = css("--joint"); ctx.beginPath(); ctx.arc(t.x(h[0]), t.y(h[1]), 4, 0, 7); ctx.fill();
+
+// ================= canvases =================
+const task = $("task"), cs = $("cspace"), plot = $("plot"), bars = $("bars");
+function fit(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
+}
+function T(w) { const s = w / (2.3 * R()); return { s, x: (x) => w / 2 + x * s, y: (y) => w / 2 - y * s, inv: (px, py) => [(px - w / 2) / s, (w / 2 - py) / s] }; }
+
+// displayed pose = state pose + wiggle
+function shownQ() {
+  const base = S.tab === "fb" && S.fb.q ? S.fb.q : S.q;
+  if (!S.wiggle) return base;
+  const t = (performance.now() - S.wiggle.t0) / 1000; if (t > 1.8) { S.wiggle = null; return base; }
+  const off = 0.28 * Math.sin(2 * Math.PI * 1.1 * t) * Math.sin(Math.PI * t / 1.8);
+  const q = base.slice(); q[S.wiggle.j] = wrap(q[S.wiggle.j] + off); return q;
+}
+
+// ================= drawing =================
+function arrow(ctx, x0, y0, x1, y1, color, width = 2.5, head = 10) {
+  const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * head * 0.7, y1 - Math.sin(a) * head * 0.7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - head * Math.cos(a - 0.42), y1 - head * Math.sin(a - 0.42));
+  ctx.lineTo(x1 - head * Math.cos(a + 0.42), y1 - head * Math.sin(a + 0.42)); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function label(ctx, x, y, txt, color, bg) {
+  ctx.save(); ctx.font = "12px ui-monospace, Menlo, monospace";
+  const W = ctx.canvas.clientWidth, tw = ctx.measureText(txt).width, X = clamp(x, 4, W - tw - 4), Y = Math.max(14, y);
+  if (bg) { ctx.fillStyle = css("--panel"); ctx.globalAlpha = 0.85; ctx.fillRect(X - 3, Y - 12, tw + 6, 16); ctx.globalAlpha = 1; }
+  ctx.fillStyle = color || css("--ink"); ctx.fillText(txt, X, Y); ctx.restore();
+}
+function crosshair(ctx, x, y, c) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 10, 0, 7); ctx.moveTo(x - 16, y); ctx.lineTo(x - 5, y); ctx.moveTo(x + 5, y); ctx.lineTo(x + 16, y); ctx.moveTo(x, y - 16); ctx.lineTo(x, y - 5); ctx.moveTo(x, y + 5); ctx.lineTo(x, y + 16); ctx.stroke(); ctx.restore(); }
+function capsule(ctx, a, b, color, width, alpha = 1) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.lineCap = "round";
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  if (width >= 8) { ctx.globalAlpha = alpha * 0.35; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = width * 0.28;
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ox = -dy / L * width * 0.18, oy = dx / L * width * 0.18;
+    ctx.beginPath(); ctx.moveTo(a[0] + ox, a[1] + oy); ctx.lineTo(b[0] + ox, b[1] + oy); ctx.stroke(); }
+  ctx.restore();
+}
+function drawArm(ctx, t, q, o = {}) {
+  const { e, h } = fk(q), B = [t.x(0), t.y(0)], E = [t.x(e[0]), t.y(e[1])], H = [t.x(h[0]), t.y(h[1])];
+  const ghost = !!o.ghost, c1 = o.color || css("--link1"), c2 = o.color2 || o.color || css("--link2"), w = o.width ?? 13;
+  ctx.save();
+  if (o.dash) {
+    ctx.setLineDash(o.dash); ctx.lineCap = "round"; ctx.globalAlpha = o.alpha ?? 0.9; ctx.lineWidth = o.width ?? 3.5;
+    ctx.strokeStyle = c1; ctx.beginPath(); ctx.moveTo(B[0], B[1]); ctx.lineTo(E[0], E[1]); ctx.stroke();
+    ctx.strokeStyle = c2; ctx.beginPath(); ctx.moveTo(E[0], E[1]); ctx.lineTo(H[0], H[1]); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = c2; ctx.beginPath(); ctx.arc(E[0], E[1], 3.5, 0, 7); ctx.fill(); ctx.restore(); return;
   }
-  ctx.restore(); return { e, h };
+  if (!ghost) { ctx.shadowColor = "rgba(0,0,0,0.22)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3; }
+  capsule(ctx, B, E, c1, w, o.alpha ?? 1); capsule(ctx, E, H, c2, w * 0.85, o.alpha ?? 1);
+  ctx.shadowColor = "transparent";
+  // gripper
+  const a = q[0] + q[1], ux = Math.cos(a), uy = -Math.sin(a), px = -uy, py = ux, gs = w * 0.75;
+  ctx.strokeStyle = ghost ? c2 : css("--joint"); ctx.lineWidth = ghost ? 2 : 3; ctx.lineCap = "round"; ctx.globalAlpha = o.alpha ?? 1;
+  ctx.beginPath();
+  ctx.moveTo(H[0] + px * gs, H[1] + py * gs); ctx.lineTo(H[0] - px * gs, H[1] - py * gs);
+  ctx.moveTo(H[0] + px * gs, H[1] + py * gs); ctx.lineTo(H[0] + px * gs + ux * gs * 1.1, H[1] + py * gs + uy * gs * 1.1);
+  ctx.moveTo(H[0] - px * gs, H[1] - py * gs); ctx.lineTo(H[0] - px * gs + ux * gs * 1.1, H[1] - py * gs + uy * gs * 1.1);
+  ctx.stroke();
+  // joints: motor housings
+  for (const [P, r] of [[B, w * 0.78], [E, w * 0.66]]) {
+    ctx.fillStyle = css("--panel"); ctx.strokeStyle = ghost ? c1 : css("--joint"); ctx.lineWidth = ghost ? 1.5 : 2.5;
+    ctx.beginPath(); ctx.arc(P[0], P[1], r, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = ghost ? c1 : css("--joint"); ctx.beginPath(); ctx.arc(P[0], P[1], r * 0.32, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = ghost ? c2 : css("--target"); ctx.beginPath(); ctx.arc(H[0] + ux * gs * 0.6, H[1] + uy * gs * 0.6, 2.5, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawBase(ctx, t) {
+  const x = t.x(0), y = t.y(0);
+  ctx.save(); ctx.fillStyle = css("--joint"); ctx.globalAlpha = 0.85;
+  ctx.beginPath(); ctx.moveTo(x - 20, y + 16); ctx.lineTo(x + 20, y + 16); ctx.lineTo(x + 12, y + 3); ctx.lineTo(x - 12, y + 3); ctx.closePath(); ctx.fill(); ctx.restore();
 }
 function drawAngles(ctx, t, q) {
-  const { e } = fk(q), r1 = 26, r2 = 22;
-  ctx.save(); ctx.lineWidth = 1.5; ctx.font = "12px ui-monospace, Menlo, monospace";
-  // θ1 from +x axis at the base
+  const { e } = fk(q), r1 = 30, r2 = 26;
+  ctx.save(); ctx.lineWidth = 1.8; ctx.font = "13px ui-monospace, Menlo, monospace";
+  ctx.strokeStyle = css("--ghost"); ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(t.x(0), t.y(0)); ctx.lineTo(t.x(0) + 44, t.y(0)); ctx.stroke(); ctx.setLineDash([]);
   ctx.strokeStyle = css("--link1"); ctx.beginPath(); ctx.arc(t.x(0), t.y(0), r1, 0, -q[0], q[0] > 0); ctx.stroke();
-  ctx.fillStyle = css("--link1"); ctx.fillText("θ₁", t.x(0) + (r1 + 6) * Math.cos(-q[0] / 2), t.y(0) + (r1 + 6) * Math.sin(-q[0] / 2) + 4);
-  // dashed extension of link 1: θ2 is measured from here
-  const ext = [e[0] + 0.45 * S.l2 * Math.cos(q[0]), e[1] + 0.45 * S.l2 * Math.sin(q[0])];
+  ctx.fillStyle = css("--link1"); ctx.fillText("θ₁", t.x(0) + (r1 + 8) * Math.cos(-q[0] / 2) - 4, t.y(0) + (r1 + 8) * Math.sin(-q[0] / 2) + 5);
+  const ext = [e[0] + 0.5 * S.l2 * Math.cos(q[0]), e[1] + 0.5 * S.l2 * Math.sin(q[0])];
   ctx.setLineDash([4, 4]); ctx.strokeStyle = css("--ghost"); ctx.beginPath(); ctx.moveTo(t.x(e[0]), t.y(e[1])); ctx.lineTo(t.x(ext[0]), t.y(ext[1])); ctx.stroke(); ctx.setLineDash([]);
   ctx.strokeStyle = css("--link2"); ctx.beginPath(); ctx.arc(t.x(e[0]), t.y(e[1]), r2, -q[0], -(q[0] + q[1]), q[1] > 0); ctx.stroke();
   const mid = -(q[0] + q[1] / 2); ctx.fillStyle = css("--link2");
-  ctx.fillText("θ₂", t.x(e[0]) + (r2 + 6) * Math.cos(mid), t.y(e[1]) + (r2 + 6) * Math.sin(mid) + 4);
+  ctx.fillText("θ₂", t.x(e[0]) + (r2 + 8) * Math.cos(mid) - 4, t.y(e[1]) + (r2 + 8) * Math.sin(mid) + 5);
   ctx.restore();
 }
-function drawTask() {
-  const { ctx, w } = fit(task), t = T(w), Rr = R();
-  ctx.clearRect(0, 0, w, w); ctx.fillStyle = css("--panel"); ctx.fillRect(0, 0, w, w);
-  // grid (1 unit)
+function drawWorld(ctx, t, w) {
+  ctx.fillStyle = css("--panel"); ctx.fillRect(0, 0, w, w);
   ctx.strokeStyle = css("--grid"); ctx.lineWidth = 1;
   for (let v = -3; v <= 3; v += 0.5) { ctx.beginPath(); ctx.moveTo(t.x(v), 0); ctx.lineTo(t.x(v), w); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, t.y(v)); ctx.lineTo(w, t.y(v)); ctx.stroke(); }
-  // workspace ring
-  if (S.showReach) {
-    if (!reachImg || reachImg.w !== w) buildReach(w);
-    ctx.drawImage(reachImg.img, 0, 0, w, w);
-  }
+  if (S.showReach) { if (!reachImg || reachImg.w !== w) buildReach(w); ctx.drawImage(reachImg.img, 0, 0, w, w); }
   ctx.strokeStyle = css("--ghost"); ctx.setLineDash([3, 5]); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(t.x(0), t.y(0), Rr * t.s, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(t.x(0), t.y(0), R() * t.s, 0, 7); ctx.stroke();
   const rin = Math.abs(S.l1 - S.l2); if (rin > 0.01) { ctx.beginPath(); ctx.arc(t.x(0), t.y(0), rin * t.s, 0, 7); ctx.stroke(); }
   ctx.setLineDash([]);
-  // floor + shelf
   if (S.floor) {
     ctx.fillStyle = css("--floor-c"); ctx.fillRect(0, t.y(0), w, w - t.y(0));
+    ctx.save(); ctx.beginPath(); ctx.rect(0, t.y(0), w, w - t.y(0)); ctx.clip(); ctx.strokeStyle = css("--floor"); ctx.globalAlpha = 0.25; ctx.lineWidth = 1;
+    for (let x = -w; x < w * 2; x += 14) { ctx.beginPath(); ctx.moveTo(x, t.y(0)); ctx.lineTo(x - w, t.y(0) + w); ctx.stroke(); } ctx.restore();
     ctx.strokeStyle = css("--floor"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, t.y(0)); ctx.lineTo(w, t.y(0)); ctx.stroke();
   }
-  if (S.shelf) { const B = shelfBox(); ctx.fillStyle = css("--shelf-c"); ctx.strokeStyle = css("--shelf"); ctx.lineWidth = 2;
-    ctx.fillRect(t.x(B.x0), t.y(B.y1), (B.x1 - B.x0) * t.s, (B.y1 - B.y0) * t.s); ctx.strokeRect(t.x(B.x0), t.y(B.y1), (B.x1 - B.x0) * t.s, (B.y1 - B.y0) * t.s); }
-  // base
-  ctx.fillStyle = css("--joint"); ctx.fillRect(t.x(0) - 14, t.y(0), 28, 6);
-
-  const legend = [];
-  const bad = status(S.q) !== 0;
-  if (S.tab === "fk") {
-    const { h } = fk(S.q);
-    ctx.strokeStyle = css("--ghost"); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(h[0]), t.y(0)); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(0), t.y(h[1])); ctx.stroke(); ctx.setLineDash([]);
-    drawArm(ctx, t, S.q, bad ? { color: css("--bad"), color2: css("--bad") } : {});
-    drawAngles(ctx, t, S.q);
-    label(ctx, t.x(h[0]) + 10, t.y(h[1]) - 10, `p = (${f2(h[0])}, ${f2(h[1])})`);
-    legend.push(sw("--link1", "link 1"), sw("--link2", "link 2 (angle θ₁+θ₂)"), "dashed grey = link 1 extended: θ₂ is measured from it");
-  } else if (S.tab === "ik") {
-    const res = ik(S.target), cur = S.q;
-    const valid = res.sols.map((q) => status(q) === 0);
-    res.sols.forEach((q, k) => { if (!sameQ(q, cur)) drawArm(ctx, t, q, { dash: [7, 6], width: 4, alpha: 0.9, color: valid[k] ? css("--ghost") : css("--bad"), noJoints: true }); });
-    let closest = null;
-    if (!valid.some(Boolean)) { closest = closestFeasible(S.target); if (closest) drawArm(ctx, t, closest.q, { dash: [2, 5], width: 4, color: css("--target"), alpha: 0.7, noJoints: true }); }
-    drawArm(ctx, t, cur, bad ? { color: css("--bad"), color2: css("--bad") } : {});
-    crosshair(ctx, t.x(S.target[0]), t.y(S.target[1]), css("--target"));
-    legend.push(sw("--ghost", "other IK solution"), sw("--bad", "blocked solution"), sw("--target", "target / closest feasible pose"));
-  } else if (S.tab === "jac") {
-    drawArm(ctx, t, S.q, bad ? { color: css("--bad"), color2: css("--bad") } : {});
-    const { h } = fk(S.q), J = jac(S.q), k = 0.35 * t.s, hx = t.x(h[0]), hy = t.y(h[1]);
-    // manipulability ellipse: image of the unit circle of joint velocities
-    ctx.strokeStyle = css("--muted"); ctx.lineWidth = 1.2; ctx.beginPath();
-    for (let i = 0; i <= 64; i++) { const a = i / 64 * 2 * Math.PI, v = mv(J, [Math.cos(a), Math.sin(a)]); const X = hx + v[0] * k, Y = hy - v[1] * k; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
-    ctx.stroke();
-    arrow(ctx, hx, hy, hx + J[0][0] * k, hy - J[1][0] * k, css("--link1"), 2.5);
-    arrow(ctx, hx, hy, hx + J[0][1] * k, hy - J[1][1] * k, css("--link2"), 2.5);
-    label(ctx, hx + J[0][0] * k + 6, hy - J[1][0] * k, "∂p/∂θ₁", css("--link1"));
-    label(ctx, hx + J[0][1] * k + 6, hy - J[1][1] * k, "∂p/∂θ₂", css("--link2"));
-    arrow(ctx, hx, hy, hx + S.pdes[0] * t.s, hy - S.pdes[1] * t.s, css("--target"), 3);
-    label(ctx, hx + S.pdes[0] * t.s + 6, hy - S.pdes[1] * t.s + 14, "ṗ*", css("--target"));
-    legend.push(sw("--link1", "column 1: shoulder nudge"), sw("--link2", "column 2: elbow nudge"), "ellipse = every hand velocity from a unit joint speed", sw("--target", "desired ṗ*"));
-  } else if (S.tab === "fb") {
-    const F = S.fb, q = F.q || S.q;
-    if (F.trail.length > 1) { ctx.strokeStyle = css("--link2"); ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5; ctx.beginPath();
-      F.trail.forEach((p, i) => (i ? ctx.lineTo(t.x(p[0]), t.y(p[1])) : ctx.moveTo(t.x(p[0]), t.y(p[1])))); ctx.stroke(); ctx.globalAlpha = 1; }
-    const tp = targetAt(F.t).p, { h } = fk(q);
-    const b = 9; ctx.fillStyle = css("--target"); ctx.globalAlpha = 0.25; ctx.fillRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b); ctx.globalAlpha = 1;
-    ctx.strokeStyle = css("--target"); ctx.lineWidth = 2; ctx.strokeRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b);
-    ctx.strokeStyle = css("--bad"); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(tp[0]), t.y(tp[1])); ctx.stroke(); ctx.setLineDash([]);
-    drawArm(ctx, t, q, status(q) !== 0 ? { color: css("--bad"), color2: css("--bad") } : {});
-    legend.push(sw("--target", "moving target (the box)"), sw("--bad", "Δp = error, or arm in collision"), sw("--link2", "hand trail"));
-  }
-  $("taskLegend").innerHTML = legend.map((x) => `<span>${x}</span>`).join("");
+  if (S.shelf) { const B = shelfBox(), x = t.x(B.x0), y = t.y(B.y1), ww = (B.x1 - B.x0) * t.s, hh = (B.y1 - B.y0) * t.s;
+    ctx.fillStyle = css("--shelf-c"); ctx.strokeStyle = css("--shelf"); ctx.lineWidth = 2; ctx.fillRect(x, y, ww, hh); ctx.strokeRect(x, y, ww, hh);
+    label(ctx, x + 6, y - 5, "shelf", css("--shelf")); }
+  drawBase(ctx, t);
 }
 const sw = (v, txt) => `<span class="sw" style="background:var(${v})"></span>${txt}`;
-function label(ctx, x, y, txt, color) {
-  ctx.save(); ctx.font = "12px ui-monospace, Menlo, monospace"; ctx.fillStyle = color || css("--ink");
-  const W = ctx.canvas.clientWidth, tw = ctx.measureText(txt).width;
-  ctx.fillText(txt, Math.max(4, Math.min(x, W - tw - 4)), Math.max(14, y)); ctx.restore();
-}
-function crosshair(ctx, x, y, c) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.moveTo(x - 14, y); ctx.lineTo(x + 14, y); ctx.moveTo(x, y - 14); ctx.lineTo(x, y + 14); ctx.stroke(); ctx.restore(); }
-const sameQ = (a, b) => Math.abs(wrap(a[0] - b[0])) < rad(1.5) && Math.abs(wrap(a[1] - b[1])) < rad(1.5);
+function drawTask() {
+  const { ctx, w } = fit(task), t = T(w), q = shownQ(), st = status(q);
+  drawWorld(ctx, t, w);
+  const legend = [], badArm = st !== 0 ? { color: css("--bad"), color2: css("--bad") } : {};
+  if (S.hoverQ && S.tab !== "fb") drawArm(ctx, t, S.hoverQ, { ghost: true, color: css("--ghost"), color2: css("--ghost"), width: 7, alpha: 0.55 });
 
+  if (S.tab === "fk") {
+    const { e, h } = fk(q);
+    ctx.save(); ctx.strokeStyle = css("--ghost"); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(h[0]), t.y(0)); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(0), t.y(h[1])); ctx.stroke(); ctx.restore();
+    drawArm(ctx, t, q, badArm);
+    // head-to-tail vectors
+    arrow(ctx, t.x(0), t.y(0), t.x(e[0]), t.y(e[1]), css("--link1"), 1.6, 8);
+    arrow(ctx, t.x(e[0]), t.y(e[1]), t.x(h[0]), t.y(h[1]), css("--link2"), 1.6, 8);
+    drawAngles(ctx, t, q);
+    label(ctx, t.x(h[0]) + 12, t.y(h[1]) - 12, `p = (${f2(h[0])}, ${f2(h[1])})`, null, true);
+    legend.push(sw("--link1", "link 1 at θ₁"), sw("--link2", "link 2 at θ₁+θ₂"), "grey dashes: θ₂ is measured from link 1's direction");
+  } else if (S.tab === "ik") {
+    const res = ik(S.target), valid = res.sols.map((s) => status(s) === 0);
+    res.sols.forEach((s, k) => { if (!sameQ(s, q)) drawArm(ctx, t, s, { dash: [8, 6], color: valid[k] ? css("--ghost") : css("--bad") });
+      const hE = fk(s).e; label(ctx, t.x(hE[0]) + 8, t.y(hE[1]) - 8, k ? "B" : "A", valid[k] ? css("--muted") : css("--bad")); });
+    if (!valid.some(Boolean)) { const c = closestCached(S.target); if (c) drawArm(ctx, t, c.q, { dash: [2, 6], color: css("--target"), width: 4 }); }
+    if (S.iter && S.iter.hand.length > 1) { ctx.save(); ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.setLineDash([1, 4]); ctx.beginPath();
+      S.iter.hand.forEach((p, i) => (i ? ctx.lineTo(t.x(p[0]), t.y(p[1])) : ctx.moveTo(t.x(p[0]), t.y(p[1])))); ctx.stroke(); ctx.restore(); }
+    drawArm(ctx, t, q, badArm);
+    crosshair(ctx, t.x(S.target[0]), t.y(S.target[1]), css("--target"));
+    legend.push(sw("--target", "target p* (drag it)"), sw("--ghost", "other solution"), sw("--bad", "blocked solution"), "green dots: closest feasible pose");
+  } else if (S.tab === "jac") {
+    drawArm(ctx, t, q, badArm);
+    const { h } = fk(q), J = jac(q), k = 0.38 * t.s, hx = t.x(h[0]), hy = t.y(h[1]);
+    ctx.save(); ctx.strokeStyle = css("--muted"); ctx.fillStyle = css("--accent"); ctx.globalAlpha = 0.9; ctx.lineWidth = 1.3; ctx.beginPath();
+    for (let i = 0; i <= 72; i++) { const a = i / 72 * 2 * Math.PI, v = mv(J, [Math.cos(a), Math.sin(a)]); const X = hx + v[0] * k, Y = hy - v[1] * k; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.closePath(); ctx.globalAlpha = 0.08; ctx.fill(); ctx.globalAlpha = 0.9; ctx.stroke(); ctx.restore();
+    const hi = S.wiggle ? S.wiggle.j : -1;
+    arrow(ctx, hx, hy, hx + J[0][0] * k, hy - J[1][0] * k, css("--link1"), hi === 0 ? 4 : 2.6);
+    arrow(ctx, hx, hy, hx + J[0][1] * k, hy - J[1][1] * k, css("--link2"), hi === 1 ? 4 : 2.6);
+    label(ctx, hx + J[0][0] * k + 6, hy - J[1][0] * k - 4, "col 1", css("--link1"), true);
+    label(ctx, hx + J[0][1] * k + 6, hy - J[1][1] * k + 14, "col 2", css("--link2"), true);
+    const vs = 1.2 * t.s; arrow(ctx, hx, hy, hx + S.pdes[0] * vs, hy - S.pdes[1] * vs, css("--target"), 3.2, 11);
+    label(ctx, hx + S.pdes[0] * vs + 8, hy - S.pdes[1] * vs + 4, "ṗ*", css("--target"), true);
+    legend.push(sw("--link1", "column 1: shoulder nudge"), sw("--link2", "column 2: elbow nudge"), "ellipse: hand velocities from unit joint speed", sw("--target", "desired ṗ*"));
+  } else if (S.tab === "fb") {
+    const F = S.fb;
+    if (F.trail.length > 1) { ctx.save(); ctx.strokeStyle = css("--link2"); ctx.globalAlpha = 0.45; ctx.lineWidth = 1.6; ctx.beginPath();
+      F.trail.forEach((p, i) => (i ? ctx.lineTo(t.x(p[0]), t.y(p[1])) : ctx.moveTo(t.x(p[0]), t.y(p[1])))); ctx.stroke(); ctx.restore(); }
+    const tp = targetAt(F.t).p, { h } = fk(q), b = 10;
+    ctx.save(); ctx.fillStyle = css("--target"); ctx.globalAlpha = 0.22; ctx.fillRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b); ctx.globalAlpha = 1;
+    ctx.strokeStyle = css("--target"); ctx.lineWidth = 2; ctx.strokeRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b);
+    ctx.strokeStyle = css("--bad"); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(tp[0]), t.y(tp[1])); ctx.stroke(); ctx.restore();
+    drawArm(ctx, t, q, badArm);
+    legend.push(sw("--target", "moving target"), sw("--bad", "Δp, or arm in collision"), sw("--link2", "hand trail"));
+  }
+  $("taskLegend").innerHTML = legend.map((x) => `<span>${x}</span>`).join("");
+  $("taskStatus").innerHTML = st === 0 ? `<span class="pill ok">pose free</span>` : `<span class="pill bad">${STATUS_TXT[st]}</span>`;
+}
 function drawCS() {
   const { ctx, w } = fit(cs);
   ctx.imageSmoothingEnabled = false; ctx.drawImage(csImg, 0, 0, w, w);
+  if (S.basins && S.tab === "ik") { buildBasins(); ctx.imageSmoothingEnabled = true; ctx.drawImage(basinImg, 0, 0, w, w); }
   const X = (th) => (deg(th) + 180) / 360 * w, Y = (th) => (180 - deg(th)) / 360 * w;
   ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
   for (const d of [-90, 0, 90]) { ctx.beginPath(); ctx.moveTo(X(rad(d)), 0); ctx.lineTo(X(rad(d)), w); ctx.moveTo(0, Y(rad(d))); ctx.lineTo(w, Y(rad(d))); ctx.stroke(); }
   ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillStyle = css("--muted");
-  ctx.fillText("θ₁ →", w - 38, Y(0) - 5); ctx.fillText("θ₂ ↑", X(0) + 5, 12);
+  ctx.fillText("θ₁ →", w - 40, Y(0) - 6); ctx.fillText("θ₂ ↑", X(0) + 6, 13);
   for (const d of [-90, 90]) { ctx.fillText(d + "°", X(rad(d)) + 3, w - 5); ctx.fillText(d + "°", 3, Y(rad(d)) - 3); }
-  // singularity lines θ2 = 0 and ±180 (det J = 0) in the Jacobian tab
-  if (S.tab === "jac") { ctx.strokeStyle = css("--bad"); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+  if (S.tab === "jac") { ctx.save(); ctx.strokeStyle = css("--bad"); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.6;
     for (const d of [0, -179.5, 179.5]) { ctx.beginPath(); ctx.moveTo(0, Y(rad(d))); ctx.lineTo(w, Y(rad(d))); ctx.stroke(); }
-    ctx.setLineDash([]); ctx.fillStyle = css("--bad"); ctx.fillText("det J = 0", 4, Y(0) + 13); }
+    ctx.restore(); ctx.fillStyle = css("--bad"); ctx.fillText("det J = 0 (arm straight)", 6, Y(0) + 14); ctx.fillText("det J = 0 (folded)", 6, 26); }
   if (S.tab === "ik") {
-    const res = ik(S.target);
-    res.sols.forEach((q, k) => { const ok = status(q) === 0; ctx.strokeStyle = ok ? css("--target") : css("--bad"); ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 8, 0, 7); ctx.stroke(); ctx.fillStyle = ctx.strokeStyle; ctx.fillText(k ? "B" : "A", X(q[0]) + 10, Y(q[1]) - 8); });
+    ik(S.target).sols.forEach((s, k) => { const ok = status(s) === 0; ctx.strokeStyle = ok ? css("--target") : css("--bad"); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(X(s[0]), Y(s[1]), 9, 0, 7); ctx.stroke(); ctx.fillStyle = ctx.strokeStyle; ctx.font = "bold 12px ui-monospace, Menlo, monospace"; ctx.fillText(k ? "B" : "A", X(s[0]) + 11, Y(s[1]) - 9); });
+    if (S.iter && S.iter.path.length > 1) polyQ(ctx, S.iter.path, X, Y, w, css("--accent"), 2.2);
   }
-  if (S.tab === "fb" && S.fb.trail.length) {
-    ctx.strokeStyle = css("--link2"); ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6; ctx.beginPath(); let prev = null;
-    for (const qq of S.fb.qtrail || []) { const x = X(qq[0]), y = Y(qq[1]); if (!prev || Math.abs(x - prev[0]) > w / 2 || Math.abs(y - prev[1]) > w / 2) ctx.moveTo(x, y); else ctx.lineTo(x, y); prev = [x, y]; }
-    ctx.stroke(); ctx.globalAlpha = 1;
-  }
-  const q = S.tab === "fb" && S.fb.q ? S.fb.q : S.q;
-  ctx.fillStyle = css("--ink"); ctx.strokeStyle = css("--panel"); ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 6, 0, 7); ctx.fill(); ctx.stroke();
+  if (S.tab === "fb" && S.fb.qtrail.length) polyQ(ctx, S.fb.qtrail, X, Y, w, css("--link2"), 1.6, 0.7);
+  if (S.hoverQ) { ctx.save(); ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.35; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(X(S.hoverQ[0]), 0); ctx.lineTo(X(S.hoverQ[0]), w); ctx.moveTo(0, Y(S.hoverQ[1])); ctx.lineTo(w, Y(S.hoverQ[1])); ctx.stroke(); ctx.restore(); }
+  const q = shownQ();
+  ctx.fillStyle = css("--ink"); ctx.strokeStyle = css("--panel"); ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 6.5, 0, 7); ctx.fill(); ctx.stroke();
+}
+function polyQ(ctx, pts, X, Y, w, color, lw, alpha = 1) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.globalAlpha = alpha; ctx.beginPath(); let prev = null;
+  for (const qq of pts) { const x = X(qq[0]), y = Y(qq[1]); if (!prev || Math.abs(x - prev[0]) > w / 2 || Math.abs(y - prev[1]) > w / 2) ctx.moveTo(x, y); else ctx.lineTo(x, y); prev = [x, y]; }
+  ctx.stroke(); ctx.restore();
 }
 
-// ---------- math panel + try-this ----------
-const TRY = {
-  fk: [
-    "Set θ₁ = 30°, θ₂ = 60°. The hand should read <b>(0.87, 1.50)</b>: that's the worked example in the U2 guide.",
-    "Move only θ₂ and watch the dashed grey line. θ₂ is measured from link 1's extension, not from the ground. That's why link 2's absolute angle is θ₁ + θ₂.",
-    "Make l₂ shorter than l₁: a hole opens in the middle of the dashed circle. The workspace is a ring with inner radius |l₁ − l₂|.",
-    "Click around the right-hand map. Every pixel is a pose, and the whole map is every pose the arm can take.",
-  ],
-  ik: [
-    "Drag the target to about (0.87, 1.50). The two answers are A = (30°, 60°) and B = (90°, −60°). Same hand, two elbows.",
-    "Drag the target outside the dashed circle. There's no exact solution, so the green dotted arm shows the closest reachable pose: the <code>min ‖p(q) − p*‖²</code> form of IK.",
-    "Turn on <b>Floor</b> and drag the target low, close to the base. One solution turns red. On the map, its ring sits in the tan region.",
-    "Turn on <b>Shelf</b> and hunt for a target that's inside the circle but where <i>both</i> solutions are blocked. The floor and shelf carve holes in configuration space, not just task space.",
-  ],
-  jac: [
-    "Look at the two arrows at the hand. Blue (column 1) is perpendicular to the base→hand line. Orange (column 2) is perpendicular to the forearm. Each column is one joint's nudge.",
-    "Slide θ₂ toward 0°. The ellipse flattens into a line and det J → 0: a <b>singularity</b>. On the map it's the red dashed line.",
-    "Set θ₂ ≈ 20°, drag ṗ* to point straight outward along the arm, pick <b>Plain inverse</b> and press Run. Joint speeds spike as the arm straightens. Switch to <b>Damped</b>: it slows down instead of blowing up.",
-    "Check the worked example: θ₁ = 30°, θ₂ = 60°, ṗ* = (0.1, 0) should give q̇ ≈ (0, −0.1). Here the arrow's length is ṗ*; the math panel shows q̇.",
-  ],
-  fb: [
-    "Step target, 50 Hz. Raise k_p from 4 to 30: faster, still smooth (k_p·Δt < 1). Push past 50 (k_p·Δt > 1): overshoot. Past 100 (> 2): unstable chatter, capped only by the joint speed limit. Now drop the control rate to 10 Hz: k_p = 25 already swings wildly. Slow loops can't take high gains.",
-    "Back to 50 Hz and k_p = 30 (smooth by the k_p·Δt rule). Add 60 ms latency: the error jumps from ~0 to swings near 1. A delay of three control ticks is enough. That's the slow shower pipe from field guide §3.3.",
-    "Circle target, k_p = 0 (feed-forward only), model error +30%. The hand drifts off the circle, because open-loop trusts a wrong model. Raise k_p to 5 and it tracks anyway: feedback makes good systems out of imperfect parts.",
-    "Turn on <b>Floor</b> with the sweep target. The controller happily drives the arm through the floor (it turns red). Tracking isn't planning: the course's 'integration' limitation.",
-  ],
+// ================= equations strip =================
+const EQ = {
+  fk: [["p(q)=\\begin{pmatrix} l_1\\cos\\theta_1 + l_2\\cos(\\theta_1+\\theta_2)\\\\ l_1\\sin\\theta_1 + l_2\\sin(\\theta_1+\\theta_2)\\end{pmatrix}", "Forward kinematics: add two arrows head to tail. One pose, one hand position."]],
+  ik: [["\\min_{q\\in\\mathcal{Q}}\\ \\lVert p(q)-p^*\\rVert_2^2", "IK as a search over allowed poses 𝒬"],
+       ["\\cos\\theta_2=\\frac{r^2-l_1^2-l_2^2}{2\\,l_1l_2}", "Closed form for two links; the ± on θ₂ gives A and B"]],
+  jac: [["\\dot p = J(q)\\,\\dot q", "Joint speeds in, hand speed out"], ["\\dot q = J(q)^{+}\\,\\dot p^*", "Differential IK: invert it"], ["\\det J = l_1 l_2\\sin\\theta_2", "Zero when the arm is straight or folded"]],
+  fb: [["\\dot q = J(q)^{+}\\big(\\dot p^* + k_p\\,\\Delta p\\big)", "Plan's velocity plus a push toward the measured error"], ["e_{k+1}=(1-k_p\\Delta t)\\,e_k", "Discrete update: smooth if k_pΔt < 1, unstable if > 2"]],
 };
-const SRC = {
-  fk: "Course: unit2/3 “Forward Kinematics” · Guide: U2 §2.3",
-  ik: "Course: unit2/3 “Inverse Kinematics”, “The Challenge of Constraints” · Guide: U2 §2.3 checkpoints 2–4",
-  jac: "Course: unit2/4 “Differential Kinematics” · Guide: U2 §2.4 worked example + singularities",
-  fb: "Course: unit2/4 “Adding Feedback Control” · Guide: U2 §2.4 feedback table · Field guide §3.1–3.3",
-};
+function renderEq() {
+  $("eq").innerHTML = EQ[S.tab].map(([tex, gloss], i) => `<div class="eqc"><div class="tex" id="tex${i}"></div><div class="gloss">${gloss}</div></div>`).join("");
+  EQ[S.tab].forEach(([tex], i) => { const el = $("tex" + i);
+    if (window.katex) { try { katex.render(tex, el, { throwOnError: false, displayMode: false }); return; } catch (e) {} }
+    el.textContent = tex.replace(/\\[a-z]+/gi, (m) => ({ "\\theta": "θ", "\\cos": "cos", "\\sin": "sin", "\\dot": "", "\\det": "det", "\\min": "min", "\\Delta": "Δ" }[m] ?? "")).replace(/[{}]/g, ""); });
+}
+
+// ================= math panel =================
 function renderMath() {
-  const q = S.tab === "fb" && S.fb.q ? S.fb.q : S.q, { h } = fk(q), st = status(q);
-  const pose = `q = (θ₁, θ₂) = (${fd(q[0])}, ${fd(q[1])})   pose: ${STATUS_TXT[st]}`;
+  const q = shownQ(), { h } = fk(q), st = status(q);
+  const pose = `q = (θ₁, θ₂) = (${fd(q[0])}, ${fd(q[1])})`;
   let m = "";
   if (S.tab === "fk") {
     m = `${pose}\n\np(q) = ( l₁cos θ₁ + l₂cos(θ₁+θ₂) ,  l₁sin θ₁ + l₂sin(θ₁+θ₂) )\n` +
         `     = ( ${f2(S.l1)}·${f3(Math.cos(q[0]))} + ${f2(S.l2)}·${f3(Math.cos(q[0] + q[1]))} ,  ${f2(S.l1)}·${f3(Math.sin(q[0]))} + ${f2(S.l2)}·${f3(Math.sin(q[0] + q[1]))} )\n` +
-        `     = ( ${f3(h[0])} , ${f3(h[1])} )\n\nreach |p| = ${f3(Math.hypot(h[0], h[1]))}   workspace ring: ${f2(Math.abs(S.l1 - S.l2))} ≤ |p| ≤ ${f2(R())}`;
+        `     = ( ${f3(h[0])} , ${f3(h[1])} )\n\nlink 2 absolute angle θ₁+θ₂ = ${fd(q[0] + q[1])}\nreach |p| = ${f3(Math.hypot(h[0], h[1]))}   workspace: ${f2(Math.abs(S.l1 - S.l2))} ≤ |p| ≤ ${f2(R())}`;
   } else if (S.tab === "ik") {
     const res = ik(S.target), p = S.target;
-    m = `target p* = (${f3(p[0])}, ${f3(p[1])})   r² = ${f3(res.r2)}\n\ncos θ₂ = (r² − l₁² − l₂²) / (2 l₁ l₂) = ${f3(res.c2)}\n`;
-    if (!res.sols.length) {
-      const c = closestFeasible(p);
-      m += `|cos θ₂| > 1  →  no exact solution (out of reach)\n\nclosest feasible pose (min ‖p(q) − p*‖²):\n  q = (${c ? fd(c.q[0]) : "—"}, ${c ? fd(c.q[1]) : "—"})   miss = ${c ? f3(c.d) : "—"}`;
-    } else {
+    m = `target p* = (${f3(p[0])}, ${f3(p[1])})   r² = ${f3(res.r2)}\ncos θ₂ = (r² − l₁² − l₂²) / (2 l₁ l₂) = ${f3(res.c2)}\n`;
+    if (!res.sols.length) { const c = closestCached(p);
+      m += `|cos θ₂| > 1 → no exact solution (out of reach)\n\nclosest feasible (min ‖p(q) − p*‖²): ${c ? `(${fd(c.q[0])}, ${fd(c.q[1])}), miss ${f3(c.d)}` : "—"}`; }
+    else {
       m += `θ₁ = atan2(y, x) − atan2(l₂ sin θ₂, l₁ + l₂ cos θ₂)\n\n`;
-      res.sols.forEach((s, k) => { const st2 = status(s); m += `${k ? "B" : "A"}: (${fd(s[0])}, ${fd(s[1])})   ${st2 === 0 ? "✓ valid" : "✗ " + STATUS_TXT[st2]}\n`; });
-      if (!res.sols.some((s) => status(s) === 0)) { const c = closestFeasible(p); m += `\nboth blocked → closest feasible: (${c ? fd(c.q[0]) : "—"}, ${c ? fd(c.q[1]) : "—"}), miss ${c ? f3(c.d) : "—"}`; }
+      res.sols.forEach((s, k) => { const s2 = status(s); m += `${k ? "B" : "A"} = (${fd(s[0]).padStart(5)}, ${fd(s[1]).padStart(5)})  ${s2 === 0 ? '<span class="pill ok">valid</span>' : '<span class="pill bad">' + STATUS_TXT[s2] + "</span>"}\n`; });
+      if (!res.sols.some((s) => status(s) === 0)) { const c = closestCached(p); m += `\nboth blocked → closest feasible ${c ? `(${fd(c.q[0])}, ${fd(c.q[1])}), miss ${f3(c.d)}` : "—"}`; }
     }
+    m += `\ncurrent ${pose}` + (S.iter ? `\niterative IK: step ${S.iter.k}, error ${f3(S.iter.err)}${S.iter.done ? "  ✓ converged" : ""}` : "");
   } else if (S.tab === "jac") {
-    const J = jac(q), d = det2(J), Pinv = S.inv === "plain" ? inv2(J) : dampedPinv(J, S.lam);
-    const qd = Pinv ? mv(Pinv, S.pdes) : null, back = qd ? mv(J, qd) : null;
+    const J = jac(q), d = det2(J), P = S.inv === "plain" ? inv2(J) : dampedPinv(J, S.lam), qd = P ? mv(P, S.pdes) : null, back = qd ? mv(J, qd) : null;
     const cls = Math.abs(d) < 0.08 ? "bad" : Math.abs(d) < 0.3 ? "warn" : "ok";
-    m = `${pose}\n\nJ(q) = [ ${f3(J[0][0]).padStart(7)}  ${f3(J[0][1]).padStart(7)} ]\n       [ ${f3(J[1][0]).padStart(7)}  ${f3(J[1][1]).padStart(7)} ]\n\n` +
-        `det J = l₁ l₂ sin θ₂ = ${f3(d)}   <span class="pill ${cls}">${cls === "bad" ? "near singular" : cls === "warn" ? "getting close" : "well-conditioned"}</span>\n\n` +
-        `ṗ* = (${f3(S.pdes[0])}, ${f3(S.pdes[1])})\n` +
-        (qd ? `q̇ = ${S.inv === "plain" ? "J⁻¹" : "J⁺(λ=" + S.lam.toFixed(2) + ")"} ṗ* = (${f3(qd[0])}, ${f3(qd[1])}) rad/s\ncheck J q̇ = (${f3(back[0])}, ${f3(back[1])})` + (S.inv === "damped" ? "   (damping trades a little accuracy for sane speeds)" : "")
+    m = `${pose}\n\nJ(q) = [ ${f3(J[0][0]).padStart(7)}  ${f3(J[0][1]).padStart(7)} ]   ← columns = the two arrows\n       [ ${f3(J[1][0]).padStart(7)}  ${f3(J[1][1]).padStart(7)} ]\n\n` +
+        `det J = l₁l₂ sin θ₂ = ${f3(d)}  <span class="pill ${cls}">${cls === "bad" ? "near singular" : cls === "warn" ? "getting close" : "well-conditioned"}</span>\n\nṗ* = (${f3(S.pdes[0])}, ${f3(S.pdes[1])})\n` +
+        (qd ? `q̇ = ${S.inv === "plain" ? "J⁻¹" : "J⁺(λ=" + S.lam.toFixed(2) + ")"} ṗ* = (${f3(qd[0])}, ${f3(qd[1])}) rad/s  ${Math.max(Math.abs(qd[0]), Math.abs(qd[1])) > 8 ? '<span class="pill bad">huge joint speed</span>' : ""}\ncheck J q̇ = (${f3(back[0])}, ${f3(back[1])})`
             : `q̇ = J⁻¹ ṗ*  →  <span class="pill bad">J is singular: no inverse</span>`);
   } else if (S.tab === "fb") {
-    const F = S.fb, dt = 1 / F.rate, kd = F.kp * dt, tp = targetAt(F.t).p, err = Math.hypot(tp[0] - h[0], tp[1] - h[1]);
-    const regime = kd < 1 ? ["ok", "smooth approach"] : kd < 2 ? ["warn", "overshoots, then settles"] : ["bad", "unstable"];
-    m = `q̇ = J(q)⁺ ( ${F.ff ? "ṗ*" : "0 "} + k_p Δp ),   Δp = p* − p(q)\n\n` +
-        `k_p = ${F.kp.toFixed(1)} /s   Δt = 1/${F.rate} Hz = ${(dt * 1000).toFixed(1)} ms\n` +
-        `k_p·Δt = ${kd.toFixed(2)}   <span class="pill ${regime[0]}">${regime[1]}</span>` + (F.lat > 0 ? `  + ${F.lat} ms latency: unstable sooner` : "") + `\n` +
-        `model error ${F.merr > 0 ? "+" : ""}${F.merr}% (controller's J uses the wrong link lengths)\n\n|Δp| now = ${f3(err)}\n${pose}`;
+    const F = S.fb, dt = 1 / F.rate, kd = F.kp * dt, tp = targetAt(F.t).p, err = Math.hypot(tp[0] - h[0], tp[1] - h[1]), d = Math.round(F.lat / 1000 / dt);
+    const regime = kd < 1 ? ["ok", "smooth"] : kd < 2 ? ["warn", "overshoots, settles"] : ["bad", "unstable"];
+    const e = errSeq(kd, d), unstable = Math.abs(e[e.length - 1]) > 1.05, ringing = e.some((x) => x < -0.01);
+    const actual = unstable ? ["bad", "unstable"] : ringing ? ["warn", "rings"] : ["ok", "smooth"];
+    m = `q̇ = J(q)⁺ ( ${F.ff ? "ṗ*" : "0 "} + k_p Δp ),   Δp = p* − p(q)\n\nk_p = ${F.kp.toFixed(1)} /s   Δt = 1/${F.rate} Hz = ${(dt * 1000).toFixed(1)} ms   latency ${F.lat} ms = ${d} tick${d === 1 ? "" : "s"}\n` +
+        `k_p·Δt = ${kd.toFixed(2)}  <span class="pill ${regime[0]}">rule of thumb: ${regime[1]}</span>  <span class="pill ${actual[0]}">${d ? "with " + d + "-tick delay" : "exact sequence"}: ${actual[1]}</span>\n` +
+        `model error ${F.merr > 0 ? "+" : ""}${F.merr}% (controller's J uses wrong link lengths)\n\n|Δp| now = ${f3(err)}` +
+        (F.path === "step" && F.lastStep ? `\nlast step: overshoot ${F.lastStep.os.toFixed(0)}%  ·  settles (2%) in ${F.lastStep.settle == null ? "> 3 s" : F.lastStep.settle.toFixed(2) + " s"}` : "") + `\n${pose}  ${st ? '<span class="pill bad">' + STATUS_TXT[st] + "</span>" : ""}`;
   }
   $("math").innerHTML = m;
-  $("try").innerHTML = `<h2 style="margin-top:14px">Try this</h2><ol>${TRY[S.tab].map((x) => `<li>${x}</li>`).join("")}</ol><div class="src">${SRC[S.tab]}</div>`;
+}
+function errSeq(kd, d, n = 40) { const e = new Array(d + 1).fill(1); for (let k = 0; k < n; k++) e.push(e[e.length - 1] - kd * e[e.length - 1 - d]); return e.slice(d); }
+function drawBars() {
+  const { ctx, w, h } = fit(bars), F = S.fb, dt = 1 / F.rate, d = Math.round(F.lat / 1000 / dt), e = errSeq(F.kp * dt, d, 36);
+  ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--chip"); ctx.fillRect(0, 0, w, h);
+  const mid = h / 2, bw = w / e.length, sc = (h / 2 - 4) / 1.6;
+  ctx.strokeStyle = css("--line"); ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+  e.forEach((v, i) => { const vv = clamp(v, -1.6, 1.6); ctx.fillStyle = Math.abs(v) > 1.6 ? css("--bad") : v >= 0 ? css("--accent") : css("--warn");
+    ctx.fillRect(i * bw + 1, vv >= 0 ? mid - vv * sc : mid, Math.max(1, bw - 2), Math.abs(vv) * sc); });
+  ctx.fillStyle = css("--muted"); ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillText("e_k (tick →)", 4, 12);
 }
 
-// ---------- feedback simulation ----------
+// ================= feedback simulation =================
 function targetAt(t) {
   const Rr = R(), path = S.fb.path;
   if (path === "step") { const A = [0.55 * Rr, 0.42 * Rr], B = [-0.3 * Rr, 0.62 * Rr]; return { p: Math.floor(t / 3) % 2 ? B : A, v: [0, 0] }; }
@@ -542,7 +702,7 @@ function targetAt(t) {
   return { p: S.fb.drag.slice(), v: [0, 0] };
 }
 function resetFB() {
-  const F = S.fb; F.t = 0; F.q = S.q.slice(); F.qdot = [0, 0]; F.nextCtl = 0; F.hist = []; F.trail = []; F.qtrail = []; F.qbuf = []; F.lastHist = 0;
+  const F = S.fb; Object.assign(F, { t: 0, q: S.q.slice(), qdot: [0, 0], nextCtl: 0, hist: [], trail: [], qtrail: [], qbuf: [], lastHist: 0, stepInfo: null, lastStep: null, switches: [] });
 }
 const SIM_DT = 0.002;
 function stepFB(realDt) {
@@ -552,18 +712,21 @@ function stepFB(realDt) {
   while (steps-- > 0) {
     F.qbuf.push(F.q.slice()); while (F.qbuf.length > lagSteps + 1) F.qbuf.shift();
     if (F.t >= F.nextCtl) {
-      const qm = F.qbuf[0];                         // measurement from `lat` ms ago
-      const pm = fk(qm).h;                          // hand measured with the true geometry (e.g. a camera)
-      const tgt = targetAt(F.t);
+      const qm = F.qbuf[0], pm = fk(qm).h, tgt = targetAt(F.t);
       const v = [(F.ff ? tgt.v[0] : 0) + F.kp * (tgt.p[0] - pm[0]), (F.ff ? tgt.v[1] : 0) + F.kp * (tgt.p[1] - pm[1])];
-      const Jm = jac(qm, S.l1 * scale, S.l2 * scale); // controller's model may be wrong
-      const P = dampedPinv(Jm, 0.02);
-      let qd = P ? mv(P, v) : [0, 0];
-      qd = qd.map((x) => Math.max(-F.qmax, Math.min(F.qmax, x)));
-      F.qdot = qd; F.nextCtl += 1 / F.rate;
+      const P = dampedPinv(jac(qm, S.l1 * scale, S.l2 * scale), 0.02);
+      F.qdot = (P ? mv(P, v) : [0, 0]).map((x) => clamp(x, -F.qmax, F.qmax)); F.nextCtl += 1 / F.rate;
     }
     F.q = [wrap(F.q[0] + F.qdot[0] * SIM_DT), wrap(F.q[1] + F.qdot[1] * SIM_DT)];
-    F.t += SIM_DT;
+    const prevIdx = Math.floor(F.t / 3); F.t += SIM_DT;
+    if (F.path === "step" && Math.floor(F.t / 3) !== prevIdx) {
+      if (F.stepInfo) F.lastStep = finishStep(F.stepInfo);
+      const h0 = fk(F.q).h, tp = targetAt(F.t).p; F.stepInfo = { t0: F.t, h0, tp, D: Math.hypot(tp[0] - h0[0], tp[1] - h0[1]), maxS: 0, lastOut: F.t };
+      F.switches.push(F.t);
+    }
+    if (F.stepInfo) { const I = F.stepInfo, h = fk(F.q).h, dx = I.tp[0] - I.h0[0], dy = I.tp[1] - I.h0[1];
+      const s = I.D > 1e-6 ? ((h[0] - I.h0[0]) * dx + (h[1] - I.h0[1]) * dy) / (I.D * I.D) : 1; I.maxS = Math.max(I.maxS, s);
+      if (Math.hypot(I.tp[0] - h[0], I.tp[1] - h[1]) > 0.02 * I.D) I.lastOut = F.t; }
     if (F.t - F.lastHist >= 0.02) {
       F.lastHist = F.t; const h = fk(F.q).h, tp = targetAt(F.t).p;
       F.hist.push([F.t, Math.hypot(tp[0] - h[0], tp[1] - h[1])]); while (F.hist.length && F.hist[0][0] < F.t - 10) F.hist.shift();
@@ -572,104 +735,302 @@ function stepFB(realDt) {
     }
   }
 }
+function finishStep(I) { const settle = I.lastOut - I.t0; return { os: Math.max(0, (I.maxS - 1) * 100), settle: settle > 2.95 ? null : settle }; }
 function drawPlot() {
   const { ctx, w, h } = fit(plot); ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--chip"); ctx.fillRect(0, 0, w, h);
   const H = S.fb.hist; if (H.length < 2) return;
   const t1 = H[H.length - 1][0], t0 = t1 - 10, ymax = Math.max(0.2, ...H.map((p) => Math.min(p[1], 3)));
-  ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.5; ctx.beginPath();
-  H.forEach(([t, e], i) => { const x = (t - t0) / 10 * w, y = h - 4 - Math.min(e, 3) / ymax * (h - 12); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  ctx.strokeStyle = css("--line"); ctx.setLineDash([3, 3]);
+  for (const s of S.fb.switches) if (s > t0) { const x = (s - t0) / 10 * w; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  ctx.setLineDash([]); ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.6; ctx.beginPath();
+  H.forEach(([t, e], i) => { const x = (t - t0) / 10 * w, y = h - 4 - Math.min(e, 3) / ymax * (h - 14); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
   ctx.fillStyle = css("--muted"); ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillText("max " + ymax.toFixed(2), 4, 12);
 }
 
-// ---------- loop ----------
+// ================= lessons =================
+const L = {
+  fk: [
+    { t: "Two links, two angles", setup: { q: [30, 60], l1: 1, l2: 1, floor: 0, shelf: 0, lim: 180 },
+      b: "<p>This is the course's SO‑100 arm with four joints locked, so it moves in a flat plane. You control just two numbers, <b>q = (θ₁, θ₂)</b>: the shoulder angle and the elbow angle.</p><p>The left pane shows where that puts the hand. The right pane is a <b>map of every possible q</b>, and the black dot is you. Drag the θ sliders and watch both move.</p>" },
+    { t: "Arrow one", setup: { q: [30, 60] },
+      b: "<p>Link 1 starts at the base and points at angle θ₁. Its tip, the elbow, sits at <b>l₁·(cos θ₁, sin θ₁)</b>.</p>",
+      ask: { type: "num", q: "With l₁ = 1 and θ₁ = 30°, what is the elbow's x‑coordinate?", a: 0.866, tol: 0.01, why: "cos 30° = 0.866, so the elbow is at (0.866, 0.5)." } },
+    { t: "Arrow two is relative", setup: { q: [30, 60] },
+      b: "<p>θ₂ is measured from the <b>grey dashed line</b>, which is link 1's own direction, not the ground. So link 2 points at <b>θ₁ + θ₂</b> in absolute terms. Forgetting this is the most common forward-kinematics mistake.</p>",
+      ask: { type: "num", q: "At q = (30°, 60°), what absolute angle does link 2 point at (degrees)?", a: 90, tol: 0.5, why: "30° + 60° = 90°, straight up. That's why link 2 is vertical." } },
+    { t: "Add the arrows", setup: { q: [30, 60] },
+      b: "<p>Hand = arrow 1 + arrow 2 = (0.866 + 0, 0.5 + 1) = <b>(0.866, 1.5)</b>. That's forward kinematics: one pose in, exactly one hand position out.</p>",
+      ask: { type: "num", q: "Predict the hand's y‑coordinate at q = (0°, 90°).", a: 1, tol: 0.01, why: "Link 1 lies flat to (1, 0). Link 2 points at 0° + 90° = up, adding (0, 1). Hand = (1, 1). The arm has just moved there.", after: { q: [0, 90] } } },
+    { t: "The map is every pose", setup: { q: [30, 60] },
+      b: "<p><b>Hover over the right-hand map.</b> Each pixel is a pose, and a grey ghost arm shows it on the left. Moving sideways changes the shoulder; moving up and down changes the elbow. Click to jump there.</p>",
+      ask: { type: "mc", q: "Where on the map is the arm perfectly straight?", o: ["Along the horizontal line θ₂ = 0", "Along the vertical line θ₁ = 0", "Only at the centre point"], a: 0, why: "Straight means the elbow isn't bent: θ₂ = 0, whatever the shoulder does. That whole row comes back in the Jacobian tab as a singularity." } },
+    { t: "The workspace is a ring", setup: { q: [45, 130], l2: 0.5 },
+      b: "<p>The blue tint is everywhere the hand can reach. With equal links it's a full disk. <b>Link 2 is now half as long</b>, and a hole has opened in the middle: the hand can't fold back to the base.</p>",
+      ask: { type: "num", q: "With l₁ = 1 and l₂ = 0.5, what is the radius of the hole?", a: 0.5, tol: 0.01, why: "|l₁ − l₂| = 0.5. The outer radius is l₁ + l₂ = 1.5. The workspace is a ring (annulus)." } },
+  ],
+  ik: [
+    { t: "Run it backwards", setup: { l1: 1, l2: 1, floor: 0, shelf: 0, lim: 180, target: [0.866, 1.5], q: [30, 60], basins: 0 },
+      b: "<p>Now you choose where the hand should go (<b>drag the green target</b>) and ask which q gets it there. That's inverse kinematics.</p><p>Look at the map: there are two rings, <b>A</b> and <b>B</b>. They're two different poses that put the hand in the same place.</p>",
+      ask: { type: "mc", q: "For a target strictly inside the reachable ring, how many poses reach it?", o: ["Exactly 1", "2", "Infinitely many"], a: 1, why: "Two: elbow one way (A) or the other (B). On the ring's edge they merge into one; outside it there are none. An arm with more joints than it needs has infinitely many." } },
+    { t: "The closed form", setup: { target: [1, 1], q: [0, 90] },
+      b: "<p>For two links there's an exact formula. First <b>cos θ₂ = (r² − l₁² − l₂²) / (2 l₁ l₂)</b>, where r is the target's distance from the base. The ± on θ₂ gives you A and B, and two atan2s then give θ₁.</p>",
+      ask: { type: "num", q: "Target (1, 1), l₁ = l₂ = 1. What is cos θ₂?", a: 0, tol: 0.01, why: "r² = 2, so (2 − 1 − 1) / 2 = 0 → θ₂ = ±90°. The two solutions are (0°, 90°) and (90°, −90°). Check the math panel." } },
+    { t: "Out of reach", setup: { target: [2.4, 0.4], q: [30, 30] },
+      b: "<p>The target is now outside the dashed circle. The formula breaks (|cos θ₂| > 1), so there's no exact answer. The <b>green dotted arm</b> is the course's optimisation form, <b>min ‖p(q) − p*‖²</b>: the closest the hand can get.</p>",
+      ask: { type: "mc", q: "What does the best miss look like for a far target?", o: ["Arm fully straight, aimed at the target", "Elbow bent at 90°", "Arm folded back on itself"], a: 0, why: "A straight arm gives maximum reach, so the closest point is the stretched-out arm pointing at the target." } },
+    { t: "The floor deletes solutions", setup: { floor: 1, shelf: 0, target: [0.9, 0.25], q: [-46.8, 124.4] },
+      b: "<p>Floor on. The target sits low and to the right. Solution A would put the elbow <b>through the floor</b>, so it's drawn red. On the map, its ring sits inside the tan region. The arm is currently in that blocked pose, so press <b>Jump to B</b>.</p>",
+      ask: { type: "mc", q: "Why does the floor change IK but not FK?", o: ["It changes the FK formula", "It removes poses from the allowed set 𝒬; FK still maps every pose to a hand position", "It moves the target"], a: 1, why: "FK is pure geometry and never changes. Obstacles carve holes in configuration space: the tan region on the map. That's what makes IK a constrained search." } },
+    { t: "Iterative IK: which answer?", setup: { floor: 0, shelf: 0, target: [0.866, 1.5], q: [-120, -30], basins: 1 },
+      b: "<p>Arms with six or more joints have no neat formula, so solvers <b>iterate</b>: they nudge q downhill on ‖p(q) − p*‖² using the Jacobian (tab 3). Press <b>▶ Solve iteratively</b> and watch the blue path on the map.</p><p>The tint on the map is the <b>basin</b> of each solution: start anywhere green and you converge to A; start in purple and you get B. Click somewhere else on the map and solve again.</p>",
+      ask: { type: "mc", q: "Which solution does an iterative solver find?", o: ["Always A", "The one whose basin you start in, usually the nearby one", "A random one each time"], a: 1, why: "It's local search, so the start decides the answer. Real robots seed IK with their current pose, so they get the solution that needs the least motion." } },
+    { t: "Inside the ring, still unreachable", setup: { floor: 1, shelf: 1, target: [1.2, 1.35], q: [60, -40], basins: 0 },
+      b: "<p>Floor and shelf on. This target is well inside the ring, yet <b>both A and B are red</b>: the forearm has to pass through the shelf either way. The green dotted arm is the best feasible pose.</p><p>This is what the course means by constraints making 𝒬 <i>much more complex</i>.</p>",
+      ask: { type: "num", q: "How many valid IK solutions does this target have?", a: 0, tol: 0.1, why: "Zero. Geometry says two, and the shelf blocks both. A planner would have to go around, or give up and reach as close as it can." } },
+  ],
+  jac: [
+    { t: "Each joint's nudge", setup: { l1: 1, l2: 1, floor: 0, shelf: 0, lim: 180, q: [30, 60], pdes: [0.1, 0], inv: "damped" },
+      b: "<p>Press <b>〰 Wiggle shoulder</b>, then <b>〰 Wiggle elbow</b>. Each wiggle moves the hand along one arrow. Those arrows are the <b>columns of the Jacobian J</b>. Column 1 is the hand velocity per unit of shoulder speed; column 2 is the same for the elbow.</p>",
+      ask: { type: "mc", q: "At q = (30°, 60°) the forearm points straight up. Which way does column 2 point?", o: ["Straight left", "Straight up", "Toward the base"], a: 0, why: "(−1, 0). Turning the elbow swings the tip of the forearm sideways, perpendicular to the forearm." } },
+    { t: "Velocities in, velocities out", setup: { q: [30, 60], pdes: [0.1, 0] },
+      b: "<p><b>ṗ = J q̇</b>: joint speeds in, hand speed out. Differential IK flips it: choose the hand speed you want and get joint speeds, <b>q̇ = J⁺ ṗ*</b>. The green arrow is ṗ* = (0.1, 0), meaning move right.</p>",
+      ask: { type: "num", q: "Predict the shoulder speed q̇₁ (rad/s) for ṗ* = (0.1, 0).", a: 0, tol: 0.01, why: "q̇ = (0, −0.1). Only the elbow turns, clockwise. The forearm is vertical, so swinging it moves the hand straight right. The math panel confirms it." } },
+    { t: "The ellipse and det J", setup: { q: [30, 60] },
+      b: "<p>The ellipse at the hand is every hand velocity you can get from joint speeds of size 1. A round ellipse means you can move well in every direction. <b>det J = l₁ l₂ sin θ₂</b> tracks how fat it is.</p>",
+      ask: { type: "num", q: "det J at (30°, 60°) with l₁ = l₂ = 1?", a: 0.866, tol: 0.01, why: "sin 60° = 0.866." } },
+    { t: "Singularity", setup: { q: [30, 14], inv: "plain", pdesOutward: 0.25 },
+      b: "<p>The elbow is nearly straight, and ṗ* points straight outward. Press <b>▶ Run diff-IK</b>. As the arm straightens, det J → 0 and the plain inverse demands exploding joint speeds (it auto-stops above 60 rad/s).</p><p>Then press <b>↺ Reset this step</b>, choose <b>Damped J⁺</b> and run again: it slows to a stop instead of blowing up.</p>",
+      ask: { type: "mc", q: "At which elbow angles is det J = 0?", o: ["θ₂ = 0° and ±180°", "θ₂ = ±90°", "θ₁ = 0°"], a: 0, why: "sin θ₂ = 0: arm fully straight or fully folded. Those are the red dashed rows on the map." } },
+    { t: "Drive it yourself", setup: { q: [60, 70], inv: "damped", pdes: [0, 0] },
+      b: "<p>Hold the arrow keys (or the pad) to command a hand velocity. Diff-IK turns it into joint speeds every frame, which is Cartesian teleoperation. Try steering along the edge of the workspace.</p><p>LeRobot's SO‑100 teleop works differently: a <b>leader arm</b> you move by hand, whose joint angles the follower simply copies.</p>",
+      ask: { type: "mc", q: "Why is leader–follower (joint-space) teleop popular for collecting robot demonstrations?", o: ["It needs no IK or Jacobian, so singularities and multiple solutions never come up", "It's more precise than any Cartesian method", "It doesn't need motors on the follower"], a: 0, why: "Copying joint angles skips this whole tab. The human's arm does the inverse kinematics." } },
+  ],
+  fb: [
+    { t: "Open loop trusts the model", setup: { l1: 1, l2: 1, floor: 0, shelf: 0, lim: 180, q: [30, 60], path: "circle", kp: 0, merr: 30, ff: 1, lat: 0, rate: 50, qmax: 8 },
+      b: "<p>The box moves in a circle. The controller only follows the plan's velocity ṗ* (k_p = 0), and its model of the arm is <b>30% wrong</b>. Watch the hand drift off the circle.</p>",
+      ask: { type: "mc", q: "Why does it drift?", o: ["Its J is built from wrong link lengths, and nothing measures the resulting error", "The motors are too slow", "The target moves too fast"], a: 0, why: "Open-loop control computes commands once and hopes. Model error accumulates with nothing to correct it." } },
+    { t: "Close the loop", setup: { path: "circle", kp: 5, merr: 30, ff: 1, lat: 0, rate: 50 },
+      b: "<p>Now <b>k_p = 5</b>: add k_p·Δp, a push toward wherever the hand actually is off by. The model is just as wrong, and the arm tracks anyway. <i>Feedback makes good systems out of imperfect components.</i></p>",
+      ask: { type: "num", q: "Ideally the error shrinks with time constant 1/k_p. What is it for k_p = 5 (seconds)?", a: 0.2, tol: 0.01, why: "1/5 = 0.2 s. Double k_p and the error closes twice as fast, up to a point (next step)." } },
+    { t: "Gain vs update rate", setup: { path: "step", kp: 30, merr: 0, ff: 1, lat: 0, rate: 50 },
+      b: "<p>Step target. A real controller updates every Δt, not continuously, so the error update is <b>e ← (1 − k_pΔt)·e</b>. The bar chart under the math panel plays that sequence for the current settings. Blue bars are the error on the starting side; amber bars mean it has overshot.</p>",
+      ask: { type: "mc", q: "At 50 Hz, what happens with k_p = 75?", o: ["Smooth approach", "Overshoots and rings, then settles", "Diverges"], a: 1, why: "k_pΔt = 1.5 is between 1 and 2: overshoot, then settle. The arm is now set to it, and the bars alternate sign. The arm itself only overshoots a few percent, because the <b>joint speed limit</b> caps the big early move and the ringing only starts once it's close. That's <i>saturation</i>, a second nonlinearity real controllers live with. Raise the speed limit to 20 and the ringing grows.", after: { kp: 75 } } },
+    { t: "Slow loops can't take high gain", setup: { path: "step", kp: 25, rate: 10, lat: 0, merr: 0 },
+      b: "<p>Same arm, now updated at <b>10 Hz</b>. k_p = 25 would be nothing special at 50 Hz.</p>",
+      ask: { type: "num", q: "What is k_p·Δt here?", a: 2.5, tol: 0.01, why: "25 × 0.1 = 2.5 > 2, so it's unstable. Only the joint speed limit keeps the arm on screen. That's why fast inner loops sit under slow policies (field guide §3.5)." } },
+    { t: "Latency", setup: { path: "step", kp: 30, rate: 50, lat: 60, merr: 0 },
+      b: "<p>Back to 50 Hz and k_p = 30 (k_pΔt = 0.6, 'smooth' by the rule). Now add <b>60 ms of latency</b>: the controller acts on a measurement three ticks old. Compare the two pills in the math panel. This is the slow shower pipe.</p>",
+      ask: { type: "mc", q: "What's the best first fix?", o: ["Lower k_p, or cut the latency", "Raise k_p to correct faster", "Raise the joint speed limit"], a: 0, why: "Delay plus high gain means acting hard on stale news. Lower the gain or shorten the loop. More gain makes it worse." } },
+    { t: "Tracking isn't planning", setup: { path: "sweep", kp: 5, rate: 50, lat: 0, merr: 0, floor: 1, shelf: 0 },
+      b: "<p>Floor on. The controller tracks the box just fine, straight through the floor (the arm turns red). Nothing in q̇ = J⁺(ṗ* + k_pΔp) knows about obstacles; that's a separate planner's job.</p>",
+      ask: { type: "mc", q: "Which of the course's four limitations of classical pipelines is this?", o: ["Integration: separate modules that each only do their own job", "Modelling limitations", "Ignoring data trends"], a: 0, why: "Planning, control and perception are separate modules with fixed interfaces. Each one is blind to what the others handle, and errors compound between them." } },
+  ],
+};
+const MORE = {
+  fk: ["Make l₁ short and l₂ long. Where does the hole go?", "Set the elbow limit to 90° and watch whole bands of the map turn grey.", "Turn on the floor: half the map disappears, because any pose with the elbow or hand below y = 0 is gone."],
+  ik: ["Turn on Basins, then drag the target slowly. The basin boundary bends and moves.", "Put the target exactly on the outer circle: A and B merge into a single ring.", "With the floor on, find a target where A is valid and B is blocked, then the reverse."],
+  jac: ["Fold the arm back (θ₂ near ±180°) and look at the ellipse: the other singularity.", "Teleop into a straight arm with the plain inverse selected, and watch the joint-speed pill.", "Change l₂ and watch det J = l₁l₂ sin θ₂ scale with it."],
+  fb: ["Circle target with feed-forward OFF: the hand lags behind the box by a steady amount. Raise k_p to shrink the lag.", "Negative model error (−30%) and k_p = 0: the drift goes the other way.", "Drag mode: fling the target around and watch the joint speed limit clip the response."],
+};
+let LS = store.get("ls", { fk: 0, ik: 0, jac: 0, fb: 0 }), DONE = store.get("done", {});
+function applySetup(s, animate = true) {
+  if (!s) return;
+  let world = false;
+  for (const k of ["l1", "l2", "lim"]) if (s[k] != null) { S[k] = s[k]; $(k).value = s[k]; world = true; }
+  for (const k of ["floor", "shelf"]) if (s[k] != null) { S[k] = !!s[k]; $(k).checked = !!s[k]; world = true; }
+  if (s.basins != null) { S.basins = !!s.basins; $("basins").checked = S.basins; }
+  if (world) rebuildWorld();
+  if (s.target) S.target = s.target.slice();
+  if (s.inv) { S.inv = s.inv; document.querySelector(`input[name=inv][value=${s.inv}]`).checked = true; }
+  if (s.pdes) S.pdes = s.pdes.slice();
+  S.runJ = false; syncRunJ(); S.iter = null;
+  const F = S.fb; let fbChanged = false;
+  for (const k of ["kp", "rate", "lat", "merr", "qmax"]) if (s[k] != null) { F[k] = s[k]; $(k).value = s[k]; fbChanged = true; }
+  if (s.ff != null) { F.ff = !!s.ff; $("ff").checked = F.ff; }
+  if (s.path) { F.path = s.path; $("path").value = s.path; fbChanged = true; }
+  if (s.q) { const to = [rad(s.q[0]), rad(s.q[1])]; if (animate && S.tab !== "fb") S.anim = { from: S.q.slice(), to, t0: performance.now(), dur: 650 }; else S.q = to; }
+  if (s.pdesOutward) { const q = s.q ? [rad(s.q[0]), rad(s.q[1])] : S.q, h = fk(q).h, n = Math.hypot(h[0], h[1]); S.pdes = [h[0] / n * s.pdesOutward, h[1] / n * s.pdesOutward]; }
+  if (S.tab === "fb" && (fbChanged || s.q || world)) { if (s.q) S.q = [rad(s.q[0]), rad(s.q[1])]; resetFB(); }
+  outputs(); syncSliders();
+}
+function renderLesson(apply) {
+  const list = L[S.tab], i = clamp(LS[S.tab], 0, list.length - 1), st = list[i];
+  $("lsTab").textContent = { fk: "Forward kinematics", ik: "Inverse kinematics", jac: "Jacobian", fb: "Feedback" }[S.tab];
+  $("lsCount").textContent = `${i + 1} / ${list.length}`;
+  $("lsTitle").textContent = st.t; $("lsBody").innerHTML = st.b;
+  $("lsDots").innerHTML = list.map((_, k) => `<button aria-label="Step ${k + 1}" class="${k === i ? "cur" : DONE[S.tab + k] ? "done" : ""}" data-k="${k}"></button>`).join("");
+  $("lsDots").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { LS[S.tab] = +b.dataset.k; store.set("ls", LS); renderLesson(true); }));
+  $("lsPrev").disabled = i === 0; $("lsNext").textContent = i === list.length - 1 ? "Done ✓" : "Next →";
+  $("more").innerHTML = MORE[S.tab].map((x) => `<li>${x}</li>`).join("");
+  const A = st.ask, box = $("lsAsk");
+  if (!A) box.innerHTML = "";
+  else if (A.type === "num") {
+    box.innerHTML = `<div class="ask"><div class="q">🤔 Predict: ${A.q}</div><div class="row" style="margin:0"><input type="number" step="any" id="ansIn" aria-label="Your answer"><button id="ansBtn">Check</button><button id="ansShow" class="ghost">Show answer</button></div><div class="fb" id="ansFb"></div></div>`;
+    const check = (reveal) => { const v = parseFloat($("ansIn").value), ok = !reveal && Math.abs(v - A.a) <= A.tol;
+      $("ansFb").className = "fb " + (ok ? "good" : reveal ? "" : "no");
+      $("ansFb").innerHTML = (ok ? "✓ Right." : reveal ? `Answer: <b>${A.a}</b>.` : isNaN(v) ? "Type a number first." : `Not quite. Try again, or show the answer.`) + (ok || reveal ? `<span class="why">${A.why}</span>` : "");
+      if (ok || reveal) { DONE[S.tab + i] = 1; store.set("done", DONE); if (A.after) applySetup(A.after); } };
+    $("ansBtn").onclick = () => check(false); $("ansShow").onclick = () => check(true);
+    $("ansIn").addEventListener("keydown", (e) => { if (e.key === "Enter") check(false); });
+  } else {
+    box.innerHTML = `<div class="ask"><div class="q">🤔 ${A.q}</div><div class="opts">${A.o.map((o, k) => `<button data-k="${k}">${o}</button>`).join("")}</div><div class="fb" id="ansFb"></div></div>`;
+    box.querySelectorAll(".opts button").forEach((b) => b.addEventListener("click", () => {
+      const k = +b.dataset.k, ok = k === A.a; b.classList.add(ok ? "right" : "wrong");
+      $("ansFb").className = "fb " + (ok ? "good" : "no");
+      $("ansFb").innerHTML = ok ? `✓ Right.<span class="why">${A.why}</span>` : "Not that one. Try another.";
+      if (ok) { DONE[S.tab + i] = 1; store.set("done", DONE); if (A.after) applySetup(A.after); } }));
+  }
+  if (apply) applySetup(st.setup);
+}
+$("lsPrev").onclick = () => { LS[S.tab] = Math.max(0, LS[S.tab] - 1); store.set("ls", LS); renderLesson(true); };
+$("lsNext").onclick = () => { const n = L[S.tab].length; if (LS[S.tab] < n - 1) { LS[S.tab]++; store.set("ls", LS); renderLesson(true); } else toast("Tab complete. Try the next tab, or the free-play experiments below."); };
+$("lsSetup").onclick = () => applySetup(L[S.tab][LS[S.tab]].setup);
+
+// ================= loop =================
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (S.tab === "jac" && S.runJ) {
-    const J = jac(S.q), P = S.inv === "plain" ? inv2(J) : dampedPinv(J, S.lam);
-    if (!P) { S.runJ = false; syncRunJ(); }
-    else { const qd = mv(P, S.pdes); const big = Math.max(Math.abs(qd[0]), Math.abs(qd[1]));
-      if (big > 60) { S.runJ = false; syncRunJ(); }
-      else { S.q = [wrap(S.q[0] + qd[0] * dt), wrap(S.q[1] + qd[1] * dt)]; syncSliders(); } }
+  if (S.anim) { const u = clamp((now - S.anim.t0) / S.anim.dur, 0, 1), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    S.q = [0, 1].map((k) => wrap(S.anim.from[k] + wrap(S.anim.to[k] - S.anim.from[k]) * e)); if (u >= 1) { S.q = S.anim.to.slice(); S.anim = null; } syncSliders(); }
+  if (S.tab === "jac") {
+    const kx = (S.keys.right ? 1 : 0) - (S.keys.left ? 1 : 0), ky = (S.keys.up ? 1 : 0) - (S.keys.down ? 1 : 0), tele = kx || ky;
+    if (tele) S.pdes = [kx * 0.45, ky * 0.45];
+    if (S.runJ || tele) {
+      const J = jac(S.q), P = S.inv === "plain" ? inv2(J) : dampedPinv(J, S.lam);
+      if (!P) { S.runJ = false; syncRunJ(); toast("J is singular: the plain inverse doesn't exist here."); }
+      else { const qd = mv(P, S.pdes), big = Math.max(Math.abs(qd[0]), Math.abs(qd[1]));
+        if (big > 60) { S.runJ = false; syncRunJ(); toast(`Stopped: the plain inverse asked for ${big.toFixed(0)} rad/s.`); }
+        else { S.q = [wrap(S.q[0] + qd[0] * dt), wrap(S.q[1] + qd[1] * dt)]; syncSliders(); } }
+    }
+  }
+  if (S.tab === "ik" && S.iter && !S.iter.done) {
+    S.iter.acc += dt; while (S.iter.acc > 1 / 30 && !S.iter.done) { S.iter.acc -= 1 / 30;
+      const r = ikStep(S.q, S.target); S.q = r.q; S.iter.err = r.err; S.iter.k++; S.iter.path.push(S.q.slice()); S.iter.hand.push(fk(S.q).h);
+      if (r.err < 1e-3 || S.iter.k >= 150) S.iter.done = true; }
+    syncSliders();
   }
   if (S.tab === "fb" && S.fb.running) stepFB(dt);
-  drawTask(); drawCS(); renderMath(); if (S.tab === "fb") drawPlot();
+  drawTask(); drawCS(); renderMath();
+  if (S.tab === "fb") { drawPlot(); drawBars(); }
   requestAnimationFrame(frame);
 }
 
-// ---------- UI wiring ----------
-function syncSliders() { $("t1").value = Math.round(deg(S.q[0])); $("t2").value = Math.round(deg(S.q[1])); outputs(); }
+// ================= UI wiring =================
+function syncSliders() { $("t1").value = Math.round(deg(S.q[0])); $("t2").value = Math.round(deg(S.q[1])); $("t1o").textContent = fd(S.q[0]); $("t2o").textContent = fd(S.q[1]); }
 function outputs() {
-  $("l1o").textContent = S.l1.toFixed(2); $("l2o").textContent = S.l2.toFixed(2); $("limo").textContent = S.lim + "°";
-  $("t1o").textContent = fd(S.q[0]); $("t2o").textContent = fd(S.q[1]); $("lamo").textContent = S.lam.toFixed(2);
+  $("l1o").textContent = S.l1.toFixed(2); $("l2o").textContent = S.l2.toFixed(2); $("limo").textContent = S.lim + "°"; $("lamo").textContent = S.lam.toFixed(2);
   const F = S.fb; $("kpo").textContent = F.kp.toFixed(1); $("rateo").textContent = F.rate; $("lato").textContent = F.lat;
-  $("merro").textContent = (F.merr > 0 ? "+" : "") + F.merr + "%"; $("qmaxo").textContent = F.qmax.toFixed(1);
+  $("merro").textContent = (F.merr > 0 ? "+" : "") + F.merr + "%"; $("qmaxo").textContent = F.qmax.toFixed(1); syncSliders();
 }
-function setTab(tab) {
+function setTab(tab, apply = true) {
   S.tab = tab; document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
   document.querySelectorAll("[data-panel]").forEach((el) => el.classList.toggle("hidden", !el.dataset.panel.split(" ").includes(tab)));
-  if (tab !== "jac") { S.runJ = false; syncRunJ(); }
-  if (tab === "fb") resetFB();
-  try { history.replaceState(null, "", "#" + tab); } catch (e) {}
+  $("basinWrap").classList.toggle("hidden", tab !== "ik"); $("basinLegend").classList.toggle("hidden", !(tab === "ik" && S.basins));
+  S.runJ = false; syncRunJ(); S.iter = null; S.hoverQ = null; S.keys = {};
+  renderEq(); renderLesson(apply); if (tab === "fb") resetFB();
+  store.set("tab", tab);
 }
 function syncRunJ() { $("runJ").textContent = S.runJ ? "⏸ Stop" : "▶ Run diff-IK"; }
+let toastT = 0; function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2600); }
 document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
-const onWorld = () => { rebuildWorld(); };
-$("floor").addEventListener("change", (e) => { S.floor = e.target.checked; onWorld(); });
-$("shelf").addEventListener("change", (e) => { S.shelf = e.target.checked; onWorld(); });
+$("floor").addEventListener("change", (e) => { S.floor = e.target.checked; rebuildWorld(); });
+$("shelf").addEventListener("change", (e) => { S.shelf = e.target.checked; rebuildWorld(); });
 $("reach").addEventListener("change", (e) => { S.showReach = e.target.checked; });
-$("l1").addEventListener("input", (e) => { S.l1 = +e.target.value; onWorld(); outputs(); });
-$("l2").addEventListener("input", (e) => { S.l2 = +e.target.value; onWorld(); outputs(); });
-$("lim").addEventListener("input", (e) => { S.lim = +e.target.value; onWorld(); outputs(); });
-$("t1").addEventListener("input", (e) => { S.q[0] = rad(+e.target.value); outputs(); });
-$("t2").addEventListener("input", (e) => { S.q[1] = rad(+e.target.value); outputs(); });
+$("basins").addEventListener("change", (e) => { S.basins = e.target.checked; $("basinLegend").classList.toggle("hidden", !S.basins); });
+for (const k of ["l1", "l2", "lim"]) $(k).addEventListener("input", (e) => { S[k] = +e.target.value; rebuildWorld(); outputs(); });
+$("t1").addEventListener("input", (e) => { S.anim = null; S.q[0] = rad(+e.target.value); syncSliders(); });
+$("t2").addEventListener("input", (e) => { S.anim = null; S.q[1] = rad(+e.target.value); syncSliders(); });
 $("lam").addEventListener("input", (e) => { S.lam = +e.target.value; outputs(); });
 document.querySelectorAll("input[name=inv]").forEach((r) => r.addEventListener("change", (e) => { S.inv = e.target.value; }));
-$("useA").addEventListener("click", () => { const s = ik(S.target).sols; if (s[0]) { S.q = s[0].slice(); syncSliders(); } });
-$("useB").addEventListener("click", () => { const s = ik(S.target).sols; if (s[1]) { S.q = s[1].slice(); syncSliders(); } });
-$("runJ").addEventListener("click", () => { S.runJ = !S.runJ; syncRunJ(); });
-$("resetJ").addEventListener("click", () => { S.q = [rad(30), rad(60)]; S.runJ = false; syncRunJ(); syncSliders(); });
-$("runF").addEventListener("click", () => { S.fb.running = !S.fb.running; $("runF").textContent = S.fb.running ? "⏸ Pause" : "▶ Run"; });
-$("resetF").addEventListener("click", resetFB);
+$("useA").onclick = () => { const s = ik(S.target).sols; if (s[0]) S.anim = { from: S.q.slice(), to: s[0].slice(), t0: performance.now(), dur: 600 }; else toast("Out of reach: no exact solution."); };
+$("useB").onclick = () => { const s = ik(S.target).sols; if (s[1]) S.anim = { from: S.q.slice(), to: s[1].slice(), t0: performance.now(), dur: 600 }; else toast("Out of reach: no exact solution."); };
+$("solve").onclick = () => { S.iter = { k: 0, err: 0, done: false, acc: 0, path: [S.q.slice()], hand: [fk(S.q).h] }; };
+$("wig1").onclick = () => { S.wiggle = { j: 0, t0: performance.now() }; };
+$("wig2").onclick = () => { S.wiggle = { j: 1, t0: performance.now() }; };
+$("runJ").onclick = () => { S.runJ = !S.runJ; syncRunJ(); };
+$("resetJ").onclick = () => { S.anim = { from: S.q.slice(), to: [rad(30), rad(60)], t0: performance.now(), dur: 600 }; S.runJ = false; syncRunJ(); };
+$("runF").onclick = () => { S.fb.running = !S.fb.running; $("runF").textContent = S.fb.running ? "⏸ Pause" : "▶ Run"; };
+$("resetF").onclick = resetFB;
 $("path").addEventListener("change", (e) => { S.fb.path = e.target.value; resetFB(); });
-for (const [id, key] of [["kp", "kp"], ["rate", "rate"], ["lat", "lat"], ["merr", "merr"], ["qmax", "qmax"]])
-  $(id).addEventListener("input", (e) => { S.fb[key] = +e.target.value; outputs(); if (key === "rate") S.fb.nextCtl = S.fb.t; });
+for (const k of ["kp", "rate", "lat", "merr", "qmax"]) $(k).addEventListener("input", (e) => { S.fb[k] = +e.target.value; outputs(); if (k === "rate") S.fb.nextCtl = S.fb.t; });
 $("ff").addEventListener("change", (e) => { S.fb.ff = e.target.checked; });
-$("theme").addEventListener("click", () => {
-  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  r.dataset.theme = dark ? "light" : "dark"; rebuildWorld();
-});
+$("theme").onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark"; store.set("theme", r.dataset.theme); rebuildWorld(); };
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rebuildWorld);
-
-// pointer on task pane
+// teleop keys + pad
+const KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right" };
+window.addEventListener("keydown", (e) => { if (S.tab !== "jac" || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || "") && document.activeElement.type !== "radio" && document.activeElement.type !== "checkbox") return;
+  const k = KEYMAP[e.key] || KEYMAP[e.key.toLowerCase()]; if (k) { S.keys[k] = true; e.preventDefault(); } });
+window.addEventListener("keyup", (e) => { const k = KEYMAP[e.key] || KEYMAP[e.key.toLowerCase()]; if (k) { S.keys[k] = false; if (!Object.values(S.keys).some(Boolean)) S.pdes = [0, 0]; } });
+document.querySelectorAll(".pad button").forEach((b) => {
+  b.addEventListener("pointerdown", (e) => { S.keys[b.dataset.k] = true; b.setPointerCapture(e.pointerId); });
+  const up = () => { S.keys[b.dataset.k] = false; if (!Object.values(S.keys).some(Boolean)) S.pdes = [0, 0]; };
+  b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up);
+});
+// pointer: task pane
 function taskPoint(ev) { const r = task.getBoundingClientRect(); return T(r.width).inv(ev.clientX - r.left, ev.clientY - r.top); }
 let dragging = false;
 function onTask(ev) {
   const p = taskPoint(ev);
-  if (S.tab === "ik") { S.target = p; }
-  else if (S.tab === "jac") { const h = fk(S.q).h; S.pdes = [p[0] - h[0], p[1] - h[1]]; }
-  else if (S.tab === "fb" && S.fb.path === "drag") { S.fb.drag = p; }
+  if (S.tab === "ik") { S.target = p; S.iter = null; }
+  else if (S.tab === "jac") { const h = fk(S.q).h; S.pdes = [(p[0] - h[0]) / 1.2, (p[1] - h[1]) / 1.2]; }
+  else if (S.tab === "fb" && S.fb.path === "drag") S.fb.drag = p;
 }
 task.addEventListener("pointerdown", (e) => { dragging = true; task.setPointerCapture(e.pointerId); onTask(e); });
 task.addEventListener("pointermove", (e) => { if (dragging) onTask(e); });
 task.addEventListener("pointerup", () => { dragging = false; });
-// pointer on C-space pane
+// pointer: C-space pane (hover preview + click/drag to set)
 let csDrag = false;
-function onCS(ev) {
-  if (S.tab === "fb") return; const r = cs.getBoundingClientRect();
-  const u = (ev.clientX - r.left) / r.width, v = (ev.clientY - r.top) / r.height;
-  S.q = [rad(-180 + u * 360), rad(180 - v * 360)].map(wrap); syncSliders();
+function csQ(ev) { const r = cs.getBoundingClientRect(); return [rad(-180 + (ev.clientX - r.left) / r.width * 360), rad(180 - (ev.clientY - r.top) / r.height * 360)].map(wrap); }
+function showTip(ev, q) {
+  const tip = $("tip"), card = $("csCard").getBoundingClientRect(), h = fk(q).h, st = status(q);
+  tip.textContent = `(${fd(q[0])}, ${fd(q[1])}) → hand (${f2(h[0])}, ${f2(h[1])})${st ? " · " + STATUS_TXT[st] : ""}`;
+  tip.classList.remove("hidden"); const x = ev.clientX - card.left + 14, y = ev.clientY - card.top + 14;
+  tip.style.left = Math.min(x, card.width - tip.offsetWidth - 8) + "px"; tip.style.top = y + "px";
 }
-cs.addEventListener("pointerdown", (e) => { csDrag = true; cs.setPointerCapture(e.pointerId); onCS(e); });
-cs.addEventListener("pointermove", (e) => { if (csDrag) onCS(e); });
+cs.addEventListener("pointerdown", (e) => { if (S.tab === "fb") return; csDrag = true; cs.setPointerCapture(e.pointerId); S.anim = null; S.iter = null; S.q = csQ(e); syncSliders(); });
+cs.addEventListener("pointermove", (e) => { const q = csQ(e); if (csDrag) { S.q = q; syncSliders(); } if (S.tab !== "fb" && e.pointerType === "mouse") { S.hoverQ = q; showTip(e, q); } });
 cs.addEventListener("pointerup", () => { csDrag = false; });
+cs.addEventListener("pointerleave", () => { S.hoverQ = null; $("tip").classList.add("hidden"); });
 window.addEventListener("resize", () => { reachImg = null; });
+// deep links:  #ik&floor=1&shelf=1&t1=30&t2=60&tx=1&ty=1&step=3 ...
+function readHash() {
+  const parts = (location.hash || "").replace(/^#/, "").split("&").filter(Boolean), out = { tab: null, s: {} };
+  for (const p of parts) { const [k, v] = p.split("="); if (v == null) { if (["fk", "ik", "jac", "fb"].includes(k)) out.tab = k; continue; }
+    const n = parseFloat(v);
+    if (["floor", "shelf", "basins", "ff"].includes(k)) out.s[k] = n; else if (["l1", "l2", "lim", "kp", "rate", "lat", "merr", "qmax"].includes(k)) out.s[k] = n;
+    else if (k === "path") out.s.path = v; else if (k === "solve") out.solve = n || 1; else if (k === "theme") out.theme = v; else if (k === "warm") out.warm = n; else if (k === "inv") out.s.inv = v; else if (k === "step") out.step = n - 1;
+    else if (k === "t1" || k === "t2") { out.s.q = out.s.q || [30, 60]; out.s.q[k === "t1" ? 0 : 1] = n; }
+    else if (k === "tx" || k === "ty") { out.s.target = out.s.target || [0.866, 1.5]; out.s.target[k === "tx" ? 0 : 1] = n; } }
+  return out;
+}
+$("copy").onclick = async () => {
+  const F = S.fb, parts = [S.tab, `step=${LS[S.tab] + 1}`, `t1=${Math.round(deg(S.q[0]))}`, `t2=${Math.round(deg(S.q[1]))}`, `l1=${S.l1}`, `l2=${S.l2}`];
+  if (S.floor) parts.push("floor=1"); if (S.shelf) parts.push("shelf=1"); if (S.lim < 180) parts.push(`lim=${S.lim}`);
+  if (S.tab === "ik") { parts.push(`tx=${S.target[0].toFixed(3)}`, `ty=${S.target[1].toFixed(3)}`); if (S.basins) parts.push("basins=1"); }
+  if (S.tab === "fb") parts.push(`path=${F.path}`, `kp=${F.kp}`, `rate=${F.rate}`, `lat=${F.lat}`, `merr=${F.merr}`);
+  const url = location.href.split("#")[0] + "#" + parts.join("&");
+  try { await navigator.clipboard.writeText(url); toast("Link copied"); } catch (e) { history.replaceState(null, "", url); toast("Link is in the address bar"); }
+};
 
-// ---------- boot ----------
-rebuildWorld(); outputs();
-const h0 = (location.hash || "").replace("#", "");
-setTab(["fk", "ik", "jac", "fb"].includes(h0) ? h0 : "fk");
-requestAnimationFrame(frame);
+// ================= boot =================
+(function boot() {
+  const th = store.get("theme", null); if (th) document.documentElement.dataset.theme = th;
+  rebuildWorld(); outputs();
+  const hsh = readHash(), tab = hsh.tab || store.get("tab", "fk");
+  if (hsh.step != null) LS[tab] = clamp(hsh.step, 0, L[tab].length - 1);
+  const deep = Object.keys(hsh.s).length > 0;
+  setTab(tab, !deep); if (deep) applySetup(hsh.s, false);
+  if (hsh.theme === "light" || hsh.theme === "dark") { document.documentElement.dataset.theme = hsh.theme; rebuildWorld(); }
+  if (hsh.solve === 2 && tab === "ik") { // instant: run the whole iterative solve now (used for screenshots)
+    S.iter = { k: 0, err: 0, done: false, acc: 0, path: [S.q.slice()], hand: [fk(S.q).h] };
+    while (!S.iter.done) { const r = ikStep(S.q, S.target); S.q = r.q; S.iter.err = r.err; S.iter.k++; S.iter.path.push(S.q.slice()); S.iter.hand.push(fk(S.q).h); if (r.err < 1e-3 || S.iter.k >= 150) S.iter.done = true; }
+    syncSliders();
+  } else if (hsh.solve && tab === "ik") setTimeout(() => $("solve").click(), 300);
+  if (hsh.warm && tab === "fb") { for (let i = 0; i < hsh.warm / 0.05; i++) stepFB(0.05); } // pre-run the sim (screenshots)
+  let tries = 0; const whenKatex = () => { if (window.katex) renderEq(); else if (tries++ < 40) setTimeout(whenKatex, 150); }; whenKatex();
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
