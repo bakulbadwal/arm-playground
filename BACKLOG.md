@@ -2,10 +2,10 @@
 
 Ideas considered and not built, with the reason, so the same discussion doesn't happen twice. Newest first.
 
-## Held for a decision (outward-facing, go out under Bakul's name)
+## Decided 2026-09-26
 
-- **Publish as a Hugging Face Space.** Hugging Face's free app hosting; the same `index.html` would live at `huggingface.co/spaces/<user>/arm-playground`, where course learners already browse. Zero code change. Do it only on an explicit yes.
-- **Offer the course's missing diagrams upstream.** The course's Unit 2 source (`units/en/unit2/*.mdx`) contains ten `<!-- TODO: ... diagram -->` placeholders. This playground already renders four of them: the two-link arm with θ₁/θ₂ (FK tab), the reachable annulus (FK tab with unequal links), the J(q) velocity micro-diagram (Jacobian tab) and the feedback block diagram (implicitly, feedback tab). Exporting those as static images and opening a discussion or PR on `huggingface/robotics-course` is a real contribution. Do it only on an explicit yes.
+- **Diagrams offered upstream: done.** [huggingface/robotics-course#37](https://github.com/huggingface/robotics-course/pull/37) fills seven of the ten `<!-- TODO: ... diagram -->` placeholders in Unit 2 with five figures: three rendered from this playground's export mode (`?export=task|cs|both`, sources in `docs/course-diagrams/`) and two hand-drawn SVGs (feedback block diagram, motion taxonomy). Remaining placeholders, offered as a follow-up in the PR: the explicit/implicit/hybrid comparison table (`1.mdx`), the Unit 2 timeline and pros/cons graphic (`5.mdx`).
+- **Publish as a Hugging Face Space: approved, waiting on a write token.** The Hub connection on this machine is read-only OAuth, so publishing needs a token saved at `~/.cache/huggingface/token`; then `~/.claude/scripts/publish-arm-playground-space.py` creates `bacool/arm-playground` as a static Space and uploads both pages, `docs/` and the README.
 
 ## Rejected, with reasons
 
