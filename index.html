@@ -48,7 +48,8 @@ html, body { margin: 0; background: var(--bg); color: var(--ink);
 a { color: var(--accent); }
 .wrap { max-width: 1240px; margin: 0 auto; padding: 22px 16px 40px; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
-.brand h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+.brand h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+.brand h1 svg { width: 34px; height: 34px; flex: none; }
 .brand .kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
 .brand p { margin: 4px 0 0; color: var(--muted); max-width: 780px; }
 .actions { display: flex; gap: 8px; }
@@ -59,13 +60,17 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 button.ghost { background: transparent; }
 nav.tabs { display: flex; gap: 6px; margin: 18px 0 10px; flex-wrap: wrap; }
-nav.tabs button { border-radius: 999px; padding: 7px 14px; }
+nav.tabs button { border-radius: 999px; padding: 7px 14px 9px; position: relative; overflow: hidden; }
+nav.tabs .prog { position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 25%, transparent); }
+nav.tabs .prog i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--ok); transition: width .3s; }
 nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .eq { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .eqc { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; box-shadow: var(--shadow); min-width: 0; }
 .eqc .tex { font-size: 16px; overflow-x: auto; overflow-y: hidden; }
 .eqc .gloss { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start;
+  grid-template-areas: "task cs" "lesson controls" "math controls"; }
+.area-task { grid-area: task; } .area-cs { grid-area: cs; } .area-lesson { grid-area: lesson; } .area-math { grid-area: math; } .area-controls { grid-area: controls; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; box-shadow: var(--shadow); position: relative; }
 .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 8px; font-weight: 650; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 canvas { display: block; width: 100%; aspect-ratio: 1 / 1; touch-action: none; border-radius: 10px; }
@@ -73,8 +78,6 @@ canvas { display: block; width: 100%; aspect-ratio: 1 / 1; touch-action: none; b
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
 .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font: 12px ui-monospace, Menlo, monospace;
   padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 2; opacity: 0.92; }
-.lower { display: grid; grid-template-columns: 1fr 1.15fr; gap: 14px; margin-top: 14px; align-items: start; }
-.stack { display: grid; gap: 14px; min-width: 0; }
 .ctl { display: grid; grid-template-columns: 150px 1fr 64px; gap: 6px 10px; align-items: center; margin-bottom: 4px; }
 .ctl label { font-size: 13px; color: var(--muted); }
 .ctl output { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
@@ -124,7 +127,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 9px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 0.95; }
 @media (max-width: 900px) {
-  .panes, .lower { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; grid-template-areas: "task" "lesson" "cs" "controls" "math"; }
   .ctl { grid-template-columns: 118px 1fr 56px; }
   .eqc .tex { font-size: 14px; }
 }
@@ -135,8 +138,8 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
   <div class="top">
     <div class="brand">
       <div class="kicker">Companion to the <a href="https://huggingface.co/learn/robotics-course" target="_blank" rel="noopener">Hugging Face Robotics Course</a> · Unit 2</div>
-      <h1>Arm Playground</h1>
-      <p>Robot kinematics and control on the course's two-joint arm. <b>Left:</b> task space, where the hand is. <b>Right:</b> configuration space, where every pixel is one pair of joint angles (θ₁, θ₂). Follow the lesson on each tab, or just play.</p>
+      <h1><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 50 L30 34" stroke="var(--link1)" stroke-width="7" stroke-linecap="round"/><path d="M30 34 L50 16" stroke="var(--link2)" stroke-width="7" stroke-linecap="round"/><circle cx="14" cy="50" r="5" fill="var(--bg)"/><circle cx="30" cy="34" r="5" fill="var(--bg)"/></svg>Arm Playground</h1>
+      <p>Robot kinematics and control on the course's two-joint arm. <b>Task space</b> shows where the hand is. <b>Configuration space</b> maps every pair of joint angles (θ₁, θ₂) as one pixel. Follow the lesson on each tab, or just play.</p>
     </div>
     <div class="actions">
       <button id="copy" title="Copy a link to exactly this setup">🔗 Copy link</button>
@@ -145,21 +148,21 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
   </div>
 
   <nav class="tabs" role="tablist" aria-label="Topics">
-    <button role="tab" data-tab="fk">1 · Forward kinematics</button>
-    <button role="tab" data-tab="ik">2 · Inverse kinematics</button>
-    <button role="tab" data-tab="jac">3 · Jacobian &amp; diff-IK</button>
-    <button role="tab" data-tab="fb">4 · Feedback control</button>
+    <button role="tab" data-tab="fk">1 · Forward kinematics<span class="prog"><i></i></span></button>
+    <button role="tab" data-tab="ik">2 · Inverse kinematics<span class="prog"><i></i></span></button>
+    <button role="tab" data-tab="jac">3 · Jacobian &amp; diff-IK<span class="prog"><i></i></span></button>
+    <button role="tab" data-tab="fb">4 · Feedback control<span class="prog"><i></i></span></button>
   </nav>
 
   <div class="eq" id="eq"></div>
 
-  <div class="panes">
-    <section class="card">
+  <div class="grid">
+    <section class="card area-task">
       <h2><span>Task space · where the hand is</span><span id="taskStatus"></span></h2>
       <canvas id="task" aria-label="Task space view of the arm"></canvas>
       <div class="legend" id="taskLegend"></div>
     </section>
-    <section class="card" id="csCard">
+    <section class="card area-cs" id="csCard">
       <h2><span>Configuration space · (θ₁, θ₂)</span>
         <label class="sub" id="basinWrap" style="margin:0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="basins"> Basins of iterative IK</label></h2>
       <canvas id="cspace" aria-label="Configuration space map: click to set the pose, hover to preview"></canvas>
@@ -170,14 +173,11 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
         <span><span class="sw" style="background:var(--shelf-c)"></span>hits shelf</span>
         <span><span class="sw" style="background:var(--limit-c)"></span>past elbow limit</span>
         <span id="basinLegend" class="hidden"><span class="sw" style="background:var(--basinA)"></span>→ A <span class="sw" style="background:var(--basinB);margin-left:6px"></span>→ B</span>
+        <span id="csNote"></span>
         <span>hover = preview · click = go there</span>
       </div>
     </section>
-  </div>
-
-  <div class="lower">
-    <div class="stack">
-      <section class="card lesson" id="lesson" aria-live="polite">
+    <section class="card lesson area-lesson" id="lesson" aria-live="polite">
         <h2><span>Lesson · <span id="lsTab"></span></span><span id="lsCount"></span></h2>
         <div class="dots" id="lsDots"></div>
         <h3 id="lsTitle"></h3>
@@ -190,7 +190,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
         </div>
         <details class="more"><summary>More experiments for free play</summary><ol id="more"></ol></details>
       </section>
-      <section class="card">
+      <section class="card area-math">
         <h2>The math, live</h2>
         <div class="math" id="math"></div>
         <div data-panel="fb">
@@ -198,9 +198,8 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
           <canvas id="bars" aria-label="Discrete error sequence"></canvas>
         </div>
       </section>
-    </div>
 
-    <section class="card">
+    <section class="card area-controls">
       <h2>Controls</h2>
       <div class="checks">
         <label><input type="checkbox" id="floor"> Floor</label>
@@ -299,7 +298,7 @@ const S = {
   tab: "fk", l1: 1, l2: 1, lim: 180, floor: false, shelf: false, showReach: true, basins: false,
   q: [rad(30), rad(60)], target: [0.866, 1.5],
   pdes: [0.1, 0], inv: "damped", lam: 0.1, runJ: false, keys: {},
-  anim: null, wiggle: null, iter: null, hoverQ: null,
+  anim: null, wiggle: null, iter: null, hoverQ: null, fkTrail: [],
   fb: { kp: 4, rate: 50, lat: 0, merr: 0, qmax: 8, ff: true, path: "step", running: true,
         t: 0, q: null, qdot: [0, 0], nextCtl: 0, hist: [], qbuf: [], trail: [], qtrail: [], drag: [0.5, 1.2], lastHist: 0,
         stepInfo: null, lastStep: null, switches: [] },
@@ -550,6 +549,13 @@ function drawTask() {
 
   if (S.tab === "fk") {
     const { e, h } = fk(q);
+    // fading trail of where the hand has been: moving one slider traces a circle around that joint
+    const tr = S.fkTrail, lastP = tr[tr.length - 1];
+    if (!lastP || Math.hypot(h[0] - lastP[0], h[1] - lastP[1]) > 0.004) { tr.push(h); if (tr.length > 160) tr.shift(); }
+    if (tr.length > 1) { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 2.5;
+      for (let i = 1; i < tr.length; i++) { ctx.globalAlpha = 0.5 * i / tr.length; ctx.strokeStyle = css("--link2");
+        ctx.beginPath(); ctx.moveTo(t.x(tr[i - 1][0]), t.y(tr[i - 1][1])); ctx.lineTo(t.x(tr[i][0]), t.y(tr[i][1])); ctx.stroke(); }
+      ctx.restore(); }
     ctx.save(); ctx.strokeStyle = css("--ghost"); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(h[0]), t.y(0)); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(0), t.y(h[1])); ctx.stroke(); ctx.restore();
     drawArm(ctx, t, q, badArm);
@@ -558,7 +564,7 @@ function drawTask() {
     arrow(ctx, t.x(e[0]), t.y(e[1]), t.x(h[0]), t.y(h[1]), css("--link2"), 1.6, 8);
     drawAngles(ctx, t, q);
     label(ctx, t.x(h[0]) + 12, t.y(h[1]) - 12, `p = (${f2(h[0])}, ${f2(h[1])})`, null, true);
-    legend.push(sw("--link1", "link 1 at θ₁"), sw("--link2", "link 2 at θ₁+θ₂"), "grey dashes: θ₂ is measured from link 1's direction");
+    legend.push(sw("--link1", "link 1 at θ₁"), sw("--link2", "link 2 at θ₁+θ₂ · fading trail = where the hand has been"), "grey dashes: θ₂ is measured from link 1's direction");
   } else if (S.tab === "ik") {
     const res = ik(S.target), valid = res.sols.map((s) => status(s) === 0);
     res.sols.forEach((s, k) => { if (!sameQ(s, q)) drawArm(ctx, t, s, { dash: [8, 6], color: valid[k] ? css("--ghost") : css("--bad") });
@@ -607,7 +613,11 @@ function drawCS() {
   ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillStyle = css("--muted");
   ctx.fillText("θ₁ →", w - 40, Y(0) - 6); ctx.fillText("θ₂ ↑", X(0) + 6, 13);
   for (const d of [-90, 90]) { ctx.fillText(d + "°", X(rad(d)) + 3, w - 5); ctx.fillText(d + "°", 3, Y(rad(d)) - 3); }
-  if (S.tab === "jac") { ctx.save(); ctx.strokeStyle = css("--bad"); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.6;
+  if (S.tab === "jac") { // |det J| = l1 l2 |sin θ2| depends only on θ2: paint it as a vertical field, strongest where the arm is straight or folded
+    const [r, g, b] = hexToRgb(css("--bad")), grad = ctx.createLinearGradient(0, 0, 0, w);
+    for (let d = -180; d <= 180; d += 4) { const a = 0.42 * Math.pow(1 - Math.abs(Math.sin(rad(d))), 3); grad.addColorStop((180 - d) / 360, `rgba(${r},${g},${b},${a.toFixed(3)})`); }
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, w);
+    ctx.save(); ctx.strokeStyle = css("--bad"); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.6;
     for (const d of [0, -179.5, 179.5]) { ctx.beginPath(); ctx.moveTo(0, Y(rad(d))); ctx.lineTo(w, Y(rad(d))); ctx.stroke(); }
     ctx.restore(); ctx.fillStyle = css("--bad"); ctx.fillText("det J = 0 (arm straight)", 6, Y(0) + 14); ctx.fillText("det J = 0 (folded)", 6, 26); }
   if (S.tab === "ik") {
@@ -615,7 +625,11 @@ function drawCS() {
       ctx.beginPath(); ctx.arc(X(s[0]), Y(s[1]), 9, 0, 7); ctx.stroke(); ctx.fillStyle = ctx.strokeStyle; ctx.font = "bold 12px ui-monospace, Menlo, monospace"; ctx.fillText(k ? "B" : "A", X(s[0]) + 11, Y(s[1]) - 9); });
     if (S.iter && S.iter.path.length > 1) polyQ(ctx, S.iter.path, X, Y, w, css("--accent"), 2.2);
   }
-  if (S.tab === "fb" && S.fb.qtrail.length) polyQ(ctx, S.fb.qtrail, X, Y, w, css("--link2"), 1.6, 0.7);
+  if (S.tab === "fb") { // where the controller "should" end up: the two IK solutions of the current target
+    if (S.fb.qtrail.length) polyQ(ctx, S.fb.qtrail, X, Y, w, css("--link2"), 1.6, 0.7);
+    ctx.save(); ctx.strokeStyle = css("--target"); ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+    for (const s of ik(targetAt(S.fb.t).p).sols) { ctx.beginPath(); ctx.arc(X(s[0]), Y(s[1]), 9, 0, 7); ctx.stroke(); } ctx.restore();
+  }
   if (S.hoverQ) { ctx.save(); ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.35; ctx.setLineDash([2, 3]);
     ctx.beginPath(); ctx.moveTo(X(S.hoverQ[0]), 0); ctx.lineTo(X(S.hoverQ[0]), w); ctx.moveTo(0, Y(S.hoverQ[1])); ctx.lineTo(w, Y(S.hoverQ[1])); ctx.stroke(); ctx.restore(); }
   const q = shownQ();
@@ -879,7 +893,7 @@ function renderLesson(apply) {
   $("lsDots").innerHTML = list.map((_, k) => `<button aria-label="Step ${k + 1}" class="${k === i ? "cur" : DONE[S.tab + k] ? "done" : ""}" data-k="${k}"></button>`).join("");
   $("lsDots").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { LS[S.tab] = +b.dataset.k; store.set("ls", LS); renderLesson(true); }));
   $("lsPrev").disabled = i === 0; $("lsNext").textContent = i === list.length - 1 ? "Done ✓" : "Next →";
-  $("more").innerHTML = MORE[S.tab].map((x) => `<li>${x}</li>`).join("");
+  $("more").innerHTML = MORE[S.tab].map((x) => `<li>${x}</li>`).join(""); syncTabProgress();
   const A = st.ask, box = $("lsAsk");
   if (!A) box.innerHTML = "";
   else if (A.type === "num") {
@@ -887,7 +901,7 @@ function renderLesson(apply) {
     const check = (reveal) => { const v = parseFloat($("ansIn").value), ok = !reveal && Math.abs(v - A.a) <= A.tol;
       $("ansFb").className = "fb " + (ok ? "good" : reveal ? "" : "no");
       $("ansFb").innerHTML = (ok ? "✓ Right." : reveal ? `Answer: <b>${A.a}</b>.` : isNaN(v) ? "Type a number first." : `Not quite. Try again, or show the answer.`) + (ok || reveal ? `<span class="why">${A.why}</span>` : "");
-      if (ok || reveal) { DONE[S.tab + i] = 1; store.set("done", DONE); if (A.after) applySetup(A.after); } };
+      if (ok || reveal) { DONE[S.tab + i] = 1; store.set("done", DONE); syncTabProgress(); if (A.after) applySetup(A.after); } };
     $("ansBtn").onclick = () => check(false); $("ansShow").onclick = () => check(true);
     $("ansIn").addEventListener("keydown", (e) => { if (e.key === "Enter") check(false); });
   } else {
@@ -896,7 +910,7 @@ function renderLesson(apply) {
       const k = +b.dataset.k, ok = k === A.a; b.classList.add(ok ? "right" : "wrong");
       $("ansFb").className = "fb " + (ok ? "good" : "no");
       $("ansFb").innerHTML = ok ? `✓ Right.<span class="why">${A.why}</span>` : "Not that one. Try another.";
-      if (ok) { DONE[S.tab + i] = 1; store.set("done", DONE); if (A.after) applySetup(A.after); } }));
+      if (ok) { DONE[S.tab + i] = 1; store.set("done", DONE); syncTabProgress(); if (A.after) applySetup(A.after); } }));
   }
   if (apply) applySetup(stepSetup(S.tab, i));
 }
@@ -948,8 +962,14 @@ function outputs() {
   const F = S.fb; $("kpo").textContent = F.kp.toFixed(1); $("rateo").textContent = F.rate; $("lato").textContent = F.lat;
   $("merro").textContent = (F.merr > 0 ? "+" : "") + F.merr + "%"; $("qmaxo").textContent = F.qmax.toFixed(1); syncSliders();
 }
+const CS_NOTE = { fk: "", ik: "rings: the two IK solutions of the target", jac: "red field: |det J| shrinking toward a singularity", fb: "dashed rings: IK solutions of the moving target" };
+function syncTabProgress() {
+  document.querySelectorAll("nav.tabs button").forEach((b) => { const tab = b.dataset.tab, n = L[tab].length; let done = 0; for (let k = 0; k < n; k++) if (DONE[tab + k]) done++;
+    b.querySelector(".prog i").style.width = (100 * done / n) + "%"; b.title = `${done} of ${n} steps done`; });
+}
 function setTab(tab, apply = true) {
-  S.tab = tab; document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  S.tab = tab; document.querySelectorAll("nav.tabs button").forEach((b) => { b.setAttribute("aria-selected", b.dataset.tab === tab); b.tabIndex = b.dataset.tab === tab ? 0 : -1; });
+  $("csNote").textContent = CS_NOTE[tab]; S.fkTrail = [];
   document.querySelectorAll("[data-panel]").forEach((el) => el.classList.toggle("hidden", !el.dataset.panel.split(" ").includes(tab)));
   S.runJ = false; syncRunJ(); S.iter = null; S.hoverQ = null; S.keys = {}; S.wiggle = null; syncBasinsUI();
   renderEq(); renderLesson(apply); if (tab === "fb") resetFB();
@@ -959,6 +979,11 @@ function syncRunJ() { $("runJ").textContent = S.runJ ? "⏸ Stop" : "▶ Run dif
 function syncBasinsUI() { $("basinWrap").classList.toggle("hidden", S.tab !== "ik"); $("basinLegend").classList.toggle("hidden", !(S.tab === "ik" && S.basins)); }
 let toastT = 0; function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2600); }
 document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+document.querySelector("nav.tabs").addEventListener("keydown", (e) => { // roving tabs: ← → between topics
+  const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+  e.preventDefault(); e.stopPropagation(); const next = TABS[(TABS.indexOf(S.tab) + d + TABS.length) % TABS.length];
+  setTab(next); document.querySelector(`nav.tabs button[data-tab=${next}]`).focus();
+});
 $("floor").addEventListener("change", (e) => { S.floor = e.target.checked; rebuildWorld(); });
 $("shelf").addEventListener("change", (e) => { S.shelf = e.target.checked; rebuildWorld(); });
 $("reach").addEventListener("change", (e) => { S.showReach = e.target.checked; });
@@ -1047,6 +1072,7 @@ $("copy").onclick = async () => {
   const hsh = readHash(), tab = hsh.tab || store.get("tab", "fk");
   if (hsh.step != null) LS[tab] = clamp(hsh.step, 0, L[tab].length - 1);
   const deep = Object.keys(hsh.s).length > 0;
+  if (!deep && tab !== "fb") S.q = [rad(-100), rad(160)]; // start folded: the lesson's own setup animates the arm awake
   setTab(tab, !deep); if (deep) applySetup(hsh.s, false);
   if (hsh.theme === "light" || hsh.theme === "dark") { document.documentElement.dataset.theme = hsh.theme; rebuildWorld(); }
   if (hsh.solve === 2 && tab === "ik") { // instant: run the whole iterative solve now (used for screenshots)
