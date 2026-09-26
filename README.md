@@ -47,7 +47,7 @@ Two views, always in sync. **Left, task space:** where the hand is. **Right, con
 | **1 · Forward kinematics** | FK is two arrows added head to tail; θ₂ is *relative*; the workspace is a ring | Drive θ₁, θ₂; change link lengths; hover the pose map | 6 steps |
 | **2 · Inverse kinematics** | IK has 0, 1 or 2 answers; obstacles delete them; iterative solvers find the one whose basin you start in | Drag a target; jump to either solution; run an **iterative (damped least-squares) solver** and see its path; paint the **basins of attraction** | 6 steps |
 | **3 · Jacobian & diff-IK** | J's columns are each joint's "nudge"; det J = l₁l₂ sin θ₂; singularities make joint speeds explode | **Wiggle** a joint to see its column; drag a desired hand velocity; run diff-IK into a singularity with a plain vs **damped** inverse; **teleop** the hand with arrow keys | 5 steps |
-| **4 · Feedback control** | Open loop trusts the model; feedback fixes model error; k_p·Δt > 1 overshoots, > 2 diverges; latency and saturation change the picture; tracking isn't planning | Step, circle, sweep or drag targets; vary **gain, control rate, latency, model error, joint speed limit**; watch the error trace, step-response metrics and the **discrete error sequence** | 6 steps |
+| **4 · Feedback control** | Open loop trusts the model; feedback fixes model error; k_p·Δt > 1 overshoots, > 2 diverges; latency and saturation change the picture; tracking isn't planning | Step, circle, sweep or drag targets; vary **gain, control rate, latency, model error, joint speed limit**; watch the error trace against the **ideal e^(−k_p t) response**, step-response metrics and the **discrete error sequence** | 6 steps |
 
 <table>
   <tr>
@@ -67,7 +67,7 @@ Two-link arm visualisers are a well-worn genre. I checked the closest ones again
 | | **Arm Playground** | [ArmLab](https://github.com/ishn-kapadia/armlab) | [ShareTechnote](https://www.sharetechnote.com/html/WebProgramming/Websim_RoboticsKinematicsI.html) | [CompuTools](https://www.compu-tools.com/robot-kinematics/) |
 |---|:-:|:-:|:-:|:-:|
 | FK and both closed-form IK solutions | ✓ | ✓ | ✓ | ✓ |
-| Joint limits | ✓ | ✓ | — (ignored by design) | ✓ |
+| Joint limits | elbow only | ✓ | — (ignored by design) | ✓ |
 | Obstacles, drawn in **configuration space** | ✓ | — | — | — |
 | Closest feasible pose when IK fails (optimisation form) | ✓ | — | — | — |
 | Iterative IK solver + **basins of attraction** | ✓ | — | — | — |
@@ -105,7 +105,8 @@ Try it: [both IK solutions blocked by a shelf](https://bakulbadwal.github.io/arm
 - **Collisions:** exact segment-vs-box tests (Liang–Barsky); the configuration-space map is a 2° grid.
 - **Iterative IK:** damped least squares (λ = 0.15, step 0.6, capped at 0.2 rad per iteration). Basins come from running it from every cell of a 120×120 grid.
 - **Feedback sim:** integrates at 2 ms. The controller updates at the chosen rate with zero-order hold, measures the hand with the true geometry (like a camera) after the chosen latency, builds J from possibly wrong link lengths, and clamps joint speeds. The bar chart shows the linearised sequence e<sub>k+1</sub> = e<sub>k</sub> − k<sub>p</sub>Δt·e<sub>k−d</sub>.
-- **Conventions:** angles in degrees in the UI and radians in the math; θ₂ is relative to link 1; lengths in abstract units (default l₁ = l₂ = 1).
+- **Conventions:** angles in degrees in the UI and radians in the math; θ₂ is relative to link 1; lengths in abstract units (default l₁ = l₂ = 1). Only the elbow has a joint limit; the shoulder is free.
+- **Lessons:** each step resets its tab to a baseline (link lengths, obstacles, inverse type) before applying its own setup, so steps are reproducible in any order. Progress is remembered in `localStorage`.
 
 ## Credits
 

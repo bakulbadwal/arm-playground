@@ -140,7 +140,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
     </div>
     <div class="actions">
       <button id="copy" title="Copy a link to exactly this setup">🔗 Copy link</button>
-      <button id="theme" title="Toggle light/dark">◐</button>
+      <button id="theme" title="Toggle light/dark" aria-label="Toggle light or dark theme">◐</button>
     </div>
   </div>
 
@@ -267,7 +267,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
         <div class="ctl"><label for="qmax">Joint speed limit</label><input type="range" id="qmax" min="1" max="20" step="0.5" value="8"><output id="qmaxo"></output></div>
         <div class="checks"><label><input type="checkbox" id="ff" checked> Feed-forward ṗ* (the plan's velocity)</label></div>
         <canvas id="plot" aria-label="Tracking error over time"></canvas>
-        <div class="sub">Tracking error |Δp| over the last 10 s (dashed = target switches)</div>
+        <div class="sub">Tracking error |Δp| over the last 10 s. Grey dashed curve = the ideal continuous response D·e<sup>−k<sub>p</sub>t</sup> after each step; the gap between it and the red line is what discrete updates, latency and the speed limit cost you.</div>
       </div>
     </section>
   </div>
@@ -460,7 +460,7 @@ function arrow(ctx, x0, y0, x1, y1, color, width = 2.5, head = 10) {
 }
 function label(ctx, x, y, txt, color, bg) {
   ctx.save(); ctx.font = "12px ui-monospace, Menlo, monospace";
-  const W = ctx.canvas.clientWidth, tw = ctx.measureText(txt).width, X = clamp(x, 4, W - tw - 4), Y = Math.max(14, y);
+  const W = ctx.canvas.clientWidth, Hh = ctx.canvas.clientHeight, tw = ctx.measureText(txt).width, X = clamp(x, 4, W - tw - 4), Y = clamp(y, 14, Hh - 4);
   if (bg) { ctx.fillStyle = css("--panel"); ctx.globalAlpha = 0.85; ctx.fillRect(X - 3, Y - 12, tw + 6, 16); ctx.globalAlpha = 1; }
   ctx.fillStyle = color || css("--ink"); ctx.fillText(txt, X, Y); ctx.restore();
 }
@@ -651,7 +651,7 @@ function renderMath() {
   if (S.tab === "fk") {
     m = `${pose}\n\np(q) = ( l₁cos θ₁ + l₂cos(θ₁+θ₂) ,  l₁sin θ₁ + l₂sin(θ₁+θ₂) )\n` +
         `     = ( ${f2(S.l1)}·${f3(Math.cos(q[0]))} + ${f2(S.l2)}·${f3(Math.cos(q[0] + q[1]))} ,  ${f2(S.l1)}·${f3(Math.sin(q[0]))} + ${f2(S.l2)}·${f3(Math.sin(q[0] + q[1]))} )\n` +
-        `     = ( ${f3(h[0])} , ${f3(h[1])} )\n\nlink 2 absolute angle θ₁+θ₂ = ${fd(q[0] + q[1])}\nreach |p| = ${f3(Math.hypot(h[0], h[1]))}   workspace: ${f2(Math.abs(S.l1 - S.l2))} ≤ |p| ≤ ${f2(R())}`;
+        `     = ( ${f3(h[0])} , ${f3(h[1])} )\n\nlink 2 absolute angle θ₁+θ₂ = ${fd(wrap(q[0] + q[1]))}\nreach |p| = ${f3(Math.hypot(h[0], h[1]))}   workspace: ${f2(Math.abs(S.l1 - S.l2))} ≤ |p| ≤ ${f2(R())}`;
   } else if (S.tab === "ik") {
     const res = ik(S.target), p = S.target;
     m = `target p* = (${f3(p[0])}, ${f3(p[1])})   r² = ${f3(res.r2)}\ncos θ₂ = (r² − l₁² − l₂²) / (2 l₁ l₂) = ${f3(res.c2)}\n`;
@@ -703,6 +703,11 @@ function targetAt(t) {
 }
 function resetFB() {
   const F = S.fb; Object.assign(F, { t: 0, q: S.q.slice(), qdot: [0, 0], nextCtl: 0, hist: [], trail: [], qtrail: [], qbuf: [], lastHist: 0, stepInfo: null, lastStep: null, switches: [] });
+  if (F.path === "step") beginStep(F, 0);
+}
+function beginStep(F, t) {
+  const h0 = fk(F.q).h, tp = targetAt(t).p, D = Math.hypot(tp[0] - h0[0], tp[1] - h0[1]);
+  F.stepInfo = { t0: t, h0, tp, D, maxS: 0, lastOut: t }; F.switches.push({ t, D });
 }
 const SIM_DT = 0.002;
 function stepFB(realDt) {
@@ -721,8 +726,7 @@ function stepFB(realDt) {
     const prevIdx = Math.floor(F.t / 3); F.t += SIM_DT;
     if (F.path === "step" && Math.floor(F.t / 3) !== prevIdx) {
       if (F.stepInfo) F.lastStep = finishStep(F.stepInfo);
-      const h0 = fk(F.q).h, tp = targetAt(F.t).p; F.stepInfo = { t0: F.t, h0, tp, D: Math.hypot(tp[0] - h0[0], tp[1] - h0[1]), maxS: 0, lastOut: F.t };
-      F.switches.push(F.t);
+      beginStep(F, F.t);
     }
     if (F.stepInfo) { const I = F.stepInfo, h = fk(F.q).h, dx = I.tp[0] - I.h0[0], dy = I.tp[1] - I.h0[1];
       const s = I.D > 1e-6 ? ((h[0] - I.h0[0]) * dx + (h[1] - I.h0[1]) * dy) / (I.D * I.D) : 1; I.maxS = Math.max(I.maxS, s);
@@ -740,10 +744,15 @@ function drawPlot() {
   const { ctx, w, h } = fit(plot); ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--chip"); ctx.fillRect(0, 0, w, h);
   const H = S.fb.hist; if (H.length < 2) return;
   const t1 = H[H.length - 1][0], t0 = t1 - 10, ymax = Math.max(0.2, ...H.map((p) => Math.min(p[1], 3)));
+  const Y = (e) => h - 4 - Math.min(e, 3) / ymax * (h - 14), Xt = (t) => (t - t0) / 10 * w;
   ctx.strokeStyle = css("--line"); ctx.setLineDash([3, 3]);
-  for (const s of S.fb.switches) if (s > t0) { const x = (s - t0) / 10 * w; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (const s of S.fb.switches) if (s.t > t0) { ctx.beginPath(); ctx.moveTo(Xt(s.t), 0); ctx.lineTo(Xt(s.t), h); ctx.stroke(); }
+  // ideal continuous response from each switch: e(t) = D·exp(−k_p (t − t_switch)), the "time constant 1/k_p" curve
+  if (S.fb.path === "step" && S.fb.kp > 0) { ctx.strokeStyle = css("--muted"); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+    for (const s of S.fb.switches) { const tEnd = Math.min(t1, s.t + 3); if (tEnd <= t0) continue; ctx.beginPath();
+      for (let t = Math.max(s.t, t0); t <= tEnd; t += 0.04) { const e = s.D * Math.exp(-S.fb.kp * (t - s.t)); t === Math.max(s.t, t0) ? ctx.moveTo(Xt(t), Y(e)) : ctx.lineTo(Xt(t), Y(e)); } ctx.stroke(); } }
   ctx.setLineDash([]); ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.6; ctx.beginPath();
-  H.forEach(([t, e], i) => { const x = (t - t0) / 10 * w, y = h - 4 - Math.min(e, 3) / ymax * (h - 14); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  H.forEach(([t, e], i) => { i ? ctx.lineTo(Xt(t), Y(e)) : ctx.moveTo(Xt(t), Y(e)); }); ctx.stroke();
   ctx.fillStyle = css("--muted"); ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillText("max " + ymax.toFixed(2), 4, 12);
 }
 
@@ -789,13 +798,13 @@ const L = {
       ask: { type: "num", q: "How many valid IK solutions does this target have?", a: 0, tol: 0.1, why: "Zero. Geometry says two, and the shelf blocks both. A planner would have to go around, or give up and reach as close as it can." } },
   ],
   jac: [
-    { t: "Each joint's nudge", setup: { l1: 1, l2: 1, floor: 0, shelf: 0, lim: 180, q: [30, 60], pdes: [0.1, 0], inv: "damped" },
+    { t: "Each joint's nudge", setup: { q: [30, 60], pdes: [0.1, 0] },
       b: "<p>Press <b>〰 Wiggle shoulder</b>, then <b>〰 Wiggle elbow</b>. Each wiggle moves the hand along one arrow. Those arrows are the <b>columns of the Jacobian J</b>. Column 1 is the hand velocity per unit of shoulder speed; column 2 is the same for the elbow.</p>",
       ask: { type: "mc", q: "At q = (30°, 60°) the forearm points straight up. Which way does column 2 point?", o: ["Straight left", "Straight up", "Toward the base"], a: 0, why: "(−1, 0). Turning the elbow swings the tip of the forearm sideways, perpendicular to the forearm." } },
-    { t: "Velocities in, velocities out", setup: { q: [30, 60], pdes: [0.1, 0] },
+    { t: "Velocities in, velocities out", setup: { q: [30, 60], pdes: [0.1, 0], inv: "plain" },
       b: "<p><b>ṗ = J q̇</b>: joint speeds in, hand speed out. Differential IK flips it: choose the hand speed you want and get joint speeds, <b>q̇ = J⁺ ṗ*</b>. The green arrow is ṗ* = (0.1, 0), meaning move right.</p>",
       ask: { type: "num", q: "Predict the shoulder speed q̇₁ (rad/s) for ṗ* = (0.1, 0).", a: 0, tol: 0.01, why: "q̇ = (0, −0.1). Only the elbow turns, clockwise. The forearm is vertical, so swinging it moves the hand straight right. The math panel confirms it." } },
-    { t: "The ellipse and det J", setup: { q: [30, 60] },
+    { t: "The ellipse and det J", setup: { q: [30, 60], pdes: [0.1, 0] },
       b: "<p>The ellipse at the hand is every hand velocity you can get from joint speeds of size 1. A round ellipse means you can move well in every direction. <b>det J = l₁ l₂ sin θ₂</b> tracks how fat it is.</p>",
       ask: { type: "num", q: "det J at (30°, 60°) with l₁ = l₂ = 1?", a: 0.866, tol: 0.01, why: "sin 60° = 0.866." } },
     { t: "Singularity", setup: { q: [30, 14], inv: "plain", pdesOutward: 0.25 },
@@ -811,7 +820,7 @@ const L = {
       ask: { type: "mc", q: "Why does it drift?", o: ["Its J is built from wrong link lengths, and nothing measures the resulting error", "The motors are too slow", "The target moves too fast"], a: 0, why: "Open-loop control computes commands once and hopes. Model error accumulates with nothing to correct it." } },
     { t: "Close the loop", setup: { path: "circle", kp: 5, merr: 30, ff: 1, lat: 0, rate: 50 },
       b: "<p>Now <b>k_p = 5</b>: add k_p·Δp, a push toward wherever the hand actually is off by. The model is just as wrong, and the arm tracks anyway. <i>Feedback makes good systems out of imperfect components.</i></p>",
-      ask: { type: "num", q: "Ideally the error shrinks with time constant 1/k_p. What is it for k_p = 5 (seconds)?", a: 0.2, tol: 0.01, why: "1/5 = 0.2 s. Double k_p and the error closes twice as fast, up to a point (next step)." } },
+      ask: { type: "num", q: "Ideally the error shrinks with time constant 1/k_p. What is it for k_p = 5 (seconds)?", a: 0.2, tol: 0.01, why: "1/5 = 0.2 s. Double k_p and the error closes twice as fast, up to a point (next step). Switch the target to Step and the grey dashed curve on the error plot is exactly this ideal e^(−k_p t)." } },
     { t: "Gain vs update rate", setup: { path: "step", kp: 30, merr: 0, ff: 1, lat: 0, rate: 50 },
       b: "<p>Step target. A real controller updates every Δt, not continuously, so the error update is <b>e ← (1 − k_pΔt)·e</b>. The bar chart under the math panel plays that sequence for the current settings. Blue bars are the error on the starting side; amber bars mean it has overshot.</p>",
       ask: { type: "mc", q: "At 50 Hz, what happens with k_p = 75?", o: ["Smooth approach", "Overshoots and rings, then settles", "Diverges"], a: 1, why: "k_pΔt = 1.5 is between 1 and 2: overshoot, then settle. The arm is now set to it, and the bars alternate sign. The arm itself only overshoots a few percent, because the <b>joint speed limit</b> caps the big early move and the ringing only starts once it's close. That's <i>saturation</i>, a second nonlinearity real controllers live with. Raise the speed limit to 20 and the ringing grows.", after: { kp: 75 } } },
@@ -827,22 +836,31 @@ const L = {
   ],
 };
 const MORE = {
-  fk: ["Make l₁ short and l₂ long. Where does the hole go?", "Set the elbow limit to 90° and watch whole bands of the map turn grey.", "Turn on the floor: half the map disappears, because any pose with the elbow or hand below y = 0 is gone."],
+  fk: ["Make l₁ short and l₂ long. Where does the hole go?", "Set the elbow limit to 90° and watch whole bands of the map turn grey.", "Turn on the floor: over half the map disappears, because any pose with the elbow or hand below y = 0 is gone."],
   ik: ["Turn on Basins, then drag the target slowly. The basin boundary bends and moves.", "Put the target exactly on the outer circle: A and B merge into a single ring.", "With the floor on, find a target where A is valid and B is blocked, then the reverse."],
   jac: ["Fold the arm back (θ₂ near ±180°) and look at the ellipse: the other singularity.", "Teleop into a straight arm with the plain inverse selected, and watch the joint-speed pill.", "Change l₂ and watch det J = l₁l₂ sin θ₂ scale with it."],
   fb: ["Circle target with feed-forward OFF: the hand lags behind the box by a steady amount. Raise k_p to shrink the lag.", "Negative model error (−30%) and k_p = 0: the drift goes the other way.", "Drag mode: fling the target around and watch the joint speed limit clip the response."],
 };
+// Every step starts from its tab's baseline so nothing leaks in from another tab (link lengths, limits, obstacles, inverse type).
+const BASE = {
+  fk: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0 },
+  ik: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, basins: 0 },
+  jac: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, inv: "plain", lam: 0.1 },
+  fb: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, q: [30, 60], qmax: 8, ff: 1, merr: 0, lat: 0, rate: 50 },
+};
+const stepSetup = (tab, i) => ({ ...BASE[tab], ...L[tab][i].setup });
 let LS = store.get("ls", { fk: 0, ik: 0, jac: 0, fb: 0 }), DONE = store.get("done", {});
 function applySetup(s, animate = true) {
   if (!s) return;
   let world = false;
   for (const k of ["l1", "l2", "lim"]) if (s[k] != null) { S[k] = s[k]; $(k).value = s[k]; world = true; }
   for (const k of ["floor", "shelf"]) if (s[k] != null) { S[k] = !!s[k]; $(k).checked = !!s[k]; world = true; }
-  if (s.basins != null) { S.basins = !!s.basins; $("basins").checked = S.basins; }
+  if (s.basins != null) { S.basins = !!s.basins; $("basins").checked = S.basins; syncBasinsUI(); }
   if (world) rebuildWorld();
   if (s.target) S.target = s.target.slice();
   if (s.inv) { S.inv = s.inv; document.querySelector(`input[name=inv][value=${s.inv}]`).checked = true; }
   if (s.pdes) S.pdes = s.pdes.slice();
+  if (s.lam != null) { S.lam = s.lam; $("lam").value = s.lam; }
   S.runJ = false; syncRunJ(); S.iter = null;
   const F = S.fb; let fbChanged = false;
   for (const k of ["kp", "rate", "lat", "merr", "qmax"]) if (s[k] != null) { F[k] = s[k]; $(k).value = s[k]; fbChanged = true; }
@@ -880,11 +898,19 @@ function renderLesson(apply) {
       $("ansFb").innerHTML = ok ? `✓ Right.<span class="why">${A.why}</span>` : "Not that one. Try another.";
       if (ok) { DONE[S.tab + i] = 1; store.set("done", DONE); if (A.after) applySetup(A.after); } }));
   }
-  if (apply) applySetup(st.setup);
+  if (apply) applySetup(stepSetup(S.tab, i));
 }
 $("lsPrev").onclick = () => { LS[S.tab] = Math.max(0, LS[S.tab] - 1); store.set("ls", LS); renderLesson(true); };
-$("lsNext").onclick = () => { const n = L[S.tab].length; if (LS[S.tab] < n - 1) { LS[S.tab]++; store.set("ls", LS); renderLesson(true); } else toast("Tab complete. Try the next tab, or the free-play experiments below."); };
-$("lsSetup").onclick = () => applySetup(L[S.tab][LS[S.tab]].setup);
+const TABS = ["fk", "ik", "jac", "fb"];
+$("lsNext").onclick = () => {
+  const n = L[S.tab].length, i = LS[S.tab];
+  if (!L[S.tab][i].ask) { DONE[S.tab + i] = 1; store.set("done", DONE); }
+  if (i < n - 1) { LS[S.tab]++; store.set("ls", LS); renderLesson(true); return; }
+  const next = TABS[TABS.indexOf(S.tab) + 1];
+  if (next) { toast("Tab complete. On to " + { ik: "inverse kinematics", jac: "the Jacobian", fb: "feedback control" }[next] + "."); setTab(next); }
+  else toast("That's all four tabs. The free-play experiments below go further.");
+};
+$("lsSetup").onclick = () => applySetup(stepSetup(S.tab, LS[S.tab]));
 
 // ================= loop =================
 let last = performance.now();
@@ -925,18 +951,18 @@ function outputs() {
 function setTab(tab, apply = true) {
   S.tab = tab; document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
   document.querySelectorAll("[data-panel]").forEach((el) => el.classList.toggle("hidden", !el.dataset.panel.split(" ").includes(tab)));
-  $("basinWrap").classList.toggle("hidden", tab !== "ik"); $("basinLegend").classList.toggle("hidden", !(tab === "ik" && S.basins));
-  S.runJ = false; syncRunJ(); S.iter = null; S.hoverQ = null; S.keys = {};
+  S.runJ = false; syncRunJ(); S.iter = null; S.hoverQ = null; S.keys = {}; S.wiggle = null; syncBasinsUI();
   renderEq(); renderLesson(apply); if (tab === "fb") resetFB();
   store.set("tab", tab);
 }
 function syncRunJ() { $("runJ").textContent = S.runJ ? "⏸ Stop" : "▶ Run diff-IK"; }
+function syncBasinsUI() { $("basinWrap").classList.toggle("hidden", S.tab !== "ik"); $("basinLegend").classList.toggle("hidden", !(S.tab === "ik" && S.basins)); }
 let toastT = 0; function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2600); }
 document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
 $("floor").addEventListener("change", (e) => { S.floor = e.target.checked; rebuildWorld(); });
 $("shelf").addEventListener("change", (e) => { S.shelf = e.target.checked; rebuildWorld(); });
 $("reach").addEventListener("change", (e) => { S.showReach = e.target.checked; });
-$("basins").addEventListener("change", (e) => { S.basins = e.target.checked; $("basinLegend").classList.toggle("hidden", !S.basins); });
+$("basins").addEventListener("change", (e) => { S.basins = e.target.checked; syncBasinsUI(); });
 for (const k of ["l1", "l2", "lim"]) $(k).addEventListener("input", (e) => { S[k] = +e.target.value; rebuildWorld(); outputs(); });
 $("t1").addEventListener("input", (e) => { S.anim = null; S.q[0] = rad(+e.target.value); syncSliders(); });
 $("t2").addEventListener("input", (e) => { S.anim = null; S.q[1] = rad(+e.target.value); syncSliders(); });
@@ -998,7 +1024,7 @@ function readHash() {
   const parts = (location.hash || "").replace(/^#/, "").split("&").filter(Boolean), out = { tab: null, s: {} };
   for (const p of parts) { const [k, v] = p.split("="); if (v == null) { if (["fk", "ik", "jac", "fb"].includes(k)) out.tab = k; continue; }
     const n = parseFloat(v);
-    if (["floor", "shelf", "basins", "ff"].includes(k)) out.s[k] = n; else if (["l1", "l2", "lim", "kp", "rate", "lat", "merr", "qmax"].includes(k)) out.s[k] = n;
+    if (["floor", "shelf", "basins", "ff"].includes(k)) out.s[k] = n; else if (["l1", "l2", "lim", "kp", "rate", "lat", "merr", "qmax", "lam"].includes(k)) out.s[k] = n;
     else if (k === "path") out.s.path = v; else if (k === "solve") out.solve = n || 1; else if (k === "theme") out.theme = v; else if (k === "warm") out.warm = n; else if (k === "inv") out.s.inv = v; else if (k === "step") out.step = n - 1;
     else if (k === "t1" || k === "t2") { out.s.q = out.s.q || [30, 60]; out.s.q[k === "t1" ? 0 : 1] = n; }
     else if (k === "tx" || k === "ty") { out.s.target = out.s.target || [0.866, 1.5]; out.s.target[k === "tx" ? 0 : 1] = n; } }
@@ -1008,7 +1034,8 @@ $("copy").onclick = async () => {
   const F = S.fb, parts = [S.tab, `step=${LS[S.tab] + 1}`, `t1=${Math.round(deg(S.q[0]))}`, `t2=${Math.round(deg(S.q[1]))}`, `l1=${S.l1}`, `l2=${S.l2}`];
   if (S.floor) parts.push("floor=1"); if (S.shelf) parts.push("shelf=1"); if (S.lim < 180) parts.push(`lim=${S.lim}`);
   if (S.tab === "ik") { parts.push(`tx=${S.target[0].toFixed(3)}`, `ty=${S.target[1].toFixed(3)}`); if (S.basins) parts.push("basins=1"); }
-  if (S.tab === "fb") parts.push(`path=${F.path}`, `kp=${F.kp}`, `rate=${F.rate}`, `lat=${F.lat}`, `merr=${F.merr}`);
+  if (S.tab === "jac") parts.push(`inv=${S.inv}`, `lam=${S.lam}`);
+  if (S.tab === "fb") parts.push(`path=${F.path}`, `kp=${F.kp}`, `rate=${F.rate}`, `lat=${F.lat}`, `merr=${F.merr}`, `qmax=${F.qmax}`, `ff=${F.ff ? 1 : 0}`);
   const url = location.href.split("#")[0] + "#" + parts.join("&");
   try { await navigator.clipboard.writeText(url); toast("Link copied"); } catch (e) { history.replaceState(null, "", url); toast("Link is in the address bar"); }
 };
