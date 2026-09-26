@@ -5,7 +5,7 @@ Ideas considered and not built, with the reason, so the same discussion doesn't 
 ## Decided 2026-09-26
 
 - **Diagrams offered upstream: done.** [huggingface/robotics-course#37](https://github.com/huggingface/robotics-course/pull/37) fills seven of the ten `<!-- TODO: ... diagram -->` placeholders in Unit 2 with five figures: three rendered from this playground's export mode (`?export=task|cs|both`, sources in `docs/course-diagrams/`) and two hand-drawn SVGs (feedback block diagram, motion taxonomy). Remaining placeholders, offered as a follow-up in the PR: the explicit/implicit/hybrid comparison table (`1.mdx`), the Unit 2 timeline and pros/cons graphic (`5.mdx`).
-- **Publish as a Hugging Face Space: approved, waiting on a write token.** The Hub connection on this machine is read-only OAuth, so publishing needs a token saved at `~/.cache/huggingface/token`; then `~/.claude/scripts/publish-arm-playground-space.py` creates `bacool/arm-playground` as a static Space and uploads both pages, `docs/` and the README.
+- **Published as a Hugging Face Space: done.** [huggingface.co/spaces/bacool/arm-playground](https://huggingface.co/spaces/bacool/arm-playground) (static; direct URL `bacool-arm-playground.static.hf.space`). Re-publish after changes with `~/.claude/scripts/publish-arm-playground-space.py`, which mirrors both pages, `docs/` and this README with the Space's YAML front matter.
 
 ## Rejected, with reasons
 

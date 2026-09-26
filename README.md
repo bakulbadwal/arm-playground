@@ -26,9 +26,12 @@
 
 <p align="center">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue">
-  <img alt="Single HTML file" src="https://img.shields.io/badge/build-none%20·%20one%20HTML%20file-2f6fdb">
+  <img alt="No build step" src="https://img.shields.io/badge/build-none%20·%20plain%20HTML-2f6fdb">
   <img alt="Works on phones" src="https://img.shields.io/badge/mobile-yes-16925b">
+  <a href="https://huggingface.co/spaces/bacool/arm-playground"><img alt="Hugging Face Space" src="https://img.shields.io/badge/🤗%20Space-bacool%2Farm--playground-ffd21e"></a>
 </p>
+
+<p align="center"><sub>Also hosted as a <a href="https://huggingface.co/spaces/bacool/arm-playground">Hugging Face Space</a>, and the source of the diagrams offered to the course in <a href="https://github.com/huggingface/robotics-course/pull/37">huggingface/robotics-course#37</a>.</sub></p>
 
 <p align="center">
   <img src="docs/solver.gif" width="880" alt="Animation: an iterative inverse-kinematics solver walks the arm from a folded pose to the target while its path is traced across the configuration-space map, coloured by which solution each starting pose converges to">
