@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arm Playground · Datasets</title>
+<meta name="description" content="Interactive companion to Unit 1 of the Hugging Face Robotics Course: how LeRobotDataset turns delta_timestamps into a temporal window of frames, with clamping at episode edges, is_pad masks, tensor shapes and the exact Python.">
+<meta property="og:title" content="Arm Playground · Datasets: see what delta_timestamps fetches">
+<meta property="og:description" content="Drag a frame through an episode of lerobot/svla_so101_pickplace and watch LeRobotDataset build the observation history and action chunk, clamp at the episode edge, and shape the tensors. A companion to Unit 1 of the Hugging Face Robotics Course.">
+<meta property="og:image" content="https://bakulbadwal.github.io/arm-playground/docs/datasets.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2315171b'/%3E%3Cpath d='M14 50 L30 34 L50 16' stroke='%236d9df0' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3Cpath d='M30 34 L50 16' stroke='%23f0994f' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='50' r='5' fill='%23fff'/%3E%3Ccircle cx='30' cy='34' r='5' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f5f4ef; --panel: #ffffff; --panel-2: #fafaf7; --ink: #1b1d22; --muted: #5f636c; --line: #dddbd2;
+  --grid: #efeee8; --link1: #2f6fdb; --link2: #e0751f; --joint: #1b1d22;
+  --target: #16925b; --ghost: #9aa0aa; --bad: #d23c3c; --ok: #16925b; --warn: #b87d00;
+  --floor: #8a7a66; --floor-c: #eadcc6; --shelf: #6d5bd0; --shelf-c: #dcd5f8; --limit-c: #e2e2e2;
+  --reach: rgba(47,111,219,0.10); --free-c: #ffffff; --accent: #2f6fdb; --chip: #f0f3fa;
+  --basinA: rgba(22,146,91,0.30); --basinB: rgba(109,91,208,0.30); --basinX: rgba(120,120,120,0.18);
+  --shadow: 0 1px 2px rgba(20,20,30,0.05), 0 6px 24px rgba(20,20,30,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121418; --panel: #1b1e24; --panel-2: #171a1f; --ink: #e9eaed; --muted: #a2a7b0; --line: #30343d;
+    --grid: #23272e; --link1: #6d9df0; --link2: #f0994f; --joint: #e9eaed;
+    --target: #3ccb8d; --ghost: #6c727c; --bad: #f06a6a; --ok: #3ccb8d; --warn: #e3b341;
+    --floor: #b7a58d; --floor-c: #463c30; --shelf: #a597f5; --shelf-c: #37315c; --limit-c: #2c2f36;
+    --reach: rgba(109,157,240,0.13); --free-c: #1b1e24; --accent: #7aa7f5; --chip: #20252f;
+    --basinA: rgba(60,203,141,0.28); --basinB: rgba(165,151,245,0.30); --basinX: rgba(160,160,160,0.14);
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121418; --panel: #1b1e24; --panel-2: #171a1f; --ink: #e9eaed; --muted: #a2a7b0; --line: #30343d;
+  --grid: #23272e; --link1: #6d9df0; --link2: #f0994f; --joint: #e9eaed;
+  --target: #3ccb8d; --ghost: #6c727c; --bad: #f06a6a; --ok: #3ccb8d; --warn: #e3b341;
+  --floor: #b7a58d; --floor-c: #463c30; --shelf: #a597f5; --shelf-c: #37315c; --limit-c: #2c2f36;
+  --reach: rgba(109,157,240,0.13); --free-c: #1b1e24; --accent: #7aa7f5; --chip: #20252f;
+  --basinA: rgba(60,203,141,0.28); --basinB: rgba(165,151,245,0.30); --basinX: rgba(160,160,160,0.14);
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+code { font: 12.5px ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--chip); padding: 1px 5px; border-radius: 5px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 22px 16px 40px; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.brand h1 svg { width: 34px; height: 34px; flex: none; }
+.brand .kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.brand p { margin: 4px 0 0; color: var(--muted); max-width: 780px; }
+.actions { display: flex; gap: 8px; }
+button, select { font: inherit; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 9px; padding: 6px 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+button:hover, select:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.ghost { background: transparent; }
+button.small { font-size: 12.5px; padding: 3px 10px; }
+nav.tabs { display: flex; gap: 6px; margin: 18px 0 10px; flex-wrap: wrap; }
+nav.tabs .tab { display: inline-block; border-radius: 999px; padding: 7px 14px 9px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; font-size: 14px; }
+nav.tabs a.tab:hover { border-color: var(--accent); }
+nav.tabs .tab[aria-current="page"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start;
+  grid-template-areas: "tl tl" "lesson editor" "sample plot" "code facts"; }
+.area-tl { grid-area: tl; } .area-lesson { grid-area: lesson; } .area-editor { grid-area: editor; } .area-sample { grid-area: sample; }
+.area-plot { grid-area: plot; } .area-code { grid-area: code; } .area-facts { grid-area: facts; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; box-shadow: var(--shadow); position: relative; }
+.card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 8px; font-weight: 650; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card h2 .pills { display: inline-flex; gap: 5px; flex-wrap: wrap; text-transform: none; letter-spacing: 0; }
+.card h2 code { text-transform: none; letter-spacing: 0; font-size: 12px; }
+#sample { font-size: 12px; }
+canvas { display: block; width: 100%; aspect-ratio: 1 / 1; touch-action: none; border-radius: 10px; }
+#tl { aspect-ratio: auto; height: 190px; cursor: ew-resize; user-select: none; -webkit-user-select: none; }
+#jp { aspect-ratio: 16 / 9; }
+.legend { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
+.sw.hatch { background: repeating-linear-gradient(135deg, var(--bad) 0 2px, transparent 2px 5px); }
+.ctl { display: grid; grid-template-columns: 150px 1fr 64px; gap: 6px 10px; align-items: center; margin-bottom: 4px; }
+.ctl.wide { grid-template-columns: 150px 1fr 118px; margin-top: 8px; }
+.ctl label { font-size: 13px; color: var(--muted); }
+.ctl output { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; font-family: ui-monospace, Menlo, monospace; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.sub { font-size: 12.5px; color: var(--muted); margin: 4px 0; }
+.sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+.math { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.7;
+  background: var(--chip); border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.math .dim { color: var(--muted); }
+.math .padT { color: var(--bad); font-weight: 650; }
+.math .kw { color: var(--accent); }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 650; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.pill.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.pill.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.pill.bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.pill.dim { background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+.hidden { display: none !important; }
+/* fetch chips under the timeline */
+.frow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.fname { font: 600 12.5px ui-monospace, Menlo, monospace; padding-left: 8px; border-left: 3px solid var(--link1); margin-right: 4px; }
+.fname.act { border-left-color: var(--link2); }
+.fchip { font: 12px ui-monospace, Menlo, monospace; background: var(--chip); border-radius: 8px; padding: 3px 8px; border-left: 3px solid var(--link1); display: inline-flex; gap: 4px 6px; align-items: center; flex-wrap: wrap; max-width: 100%; }
+.fchip.act { border-left-color: var(--link2); }
+.fchip.pad { background: color-mix(in srgb, var(--bad) 10%, var(--chip)); }
+.fchip.bad { border-left-color: var(--bad); color: var(--bad); }
+.fchip .dim { color: var(--muted); }
+/* window editor */
+.win { margin-top: 10px; }
+.winhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.winhead .sub { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.offchip { display: inline-flex; align-items: center; gap: 6px; font: 13px ui-monospace, Menlo, monospace; background: var(--chip); border: 1px solid var(--line); border-left: 3px solid var(--link1); border-radius: 999px; padding: 3px 4px 3px 10px; }
+.offchip.act { border-left-color: var(--link2); }
+.offchip i { font-style: normal; color: var(--muted); font-size: 11.5px; }
+.offchip button { border: 0; background: transparent; padding: 0 7px; line-height: 1.2; color: var(--muted); font-size: 13px; border-radius: 999px; }
+.offchip button:hover { color: var(--bad); }
+.offchip.bad { border-color: var(--bad); border-left-color: var(--bad); color: var(--bad); }
+.offchip.bad i { color: var(--bad); }
+.addoff { display: inline-flex; gap: 4px; align-items: center; }
+.addoff input { font: inherit; font-size: 13px; width: 132px; padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--line); background: var(--panel); color: var(--ink); }
+.addoff input::placeholder { color: var(--muted); }
+.err { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, transparent); border-radius: 8px; padding: 8px 10px; margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
+/* lesson */
+.lesson { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.lesson h3 { font-size: 18px; margin: 2px 0 6px; letter-spacing: -0.01em; }
+.dots { display: flex; gap: 5px; }
+.dots button { width: 22px; height: 6px; padding: 0; border-radius: 3px; background: var(--line); border: 0; }
+.dots button.done { background: color-mix(in srgb, var(--ok) 70%, transparent); }
+.dots button.cur { background: var(--accent); }
+.lbody { font-size: 15px; }
+.lbody p { margin: 0 0 8px; }
+.ask { background: var(--panel-2); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+.ask .q { font-weight: 600; margin-bottom: 8px; }
+.ask input[type=number] { font: inherit; width: 110px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.ask .opts { display: grid; gap: 6px; }
+.ask .opts button { text-align: left; }
+.ask .opts button.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--panel)); }
+.ask .opts button.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); }
+.fb { margin-top: 8px; font-size: 14px; }
+.fb.good { color: var(--ok); } .fb.no { color: var(--bad); }
+.fb .why { color: var(--ink); display: block; margin-top: 4px; }
+details.more { margin-top: 10px; font-size: 14px; }
+details.more summary { cursor: pointer; color: var(--muted); }
+details.more ol { padding-left: 20px; margin: 8px 0 0; }
+details.more li { margin-bottom: 6px; }
+details.more dl { margin: 8px 0 0; }
+details.more dt { font: 600 13px ui-monospace, Menlo, monospace; margin-top: 8px; }
+details.more dd { margin: 2px 0 0; color: var(--muted); }
+/* facts */
+table.facts { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.facts td { padding: 5px 6px 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
+table.facts tr:first-child td { border-top: 0; }
+table.facts td:first-child { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; width: 42%; word-break: break-word; }
+table.facts td:last-child { color: var(--muted); }
+kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; background: var(--panel-2); }
+footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 14px; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 9px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+.toast.show { opacity: 0.95; }
+@media (max-width: 900px) {
+  .grid { grid-template-columns: 1fr; grid-template-areas: "tl" "lesson" "editor" "plot" "sample" "code" "facts"; }
+  .ctl { grid-template-columns: 118px 1fr 56px; }
+  .ctl.wide { grid-template-columns: 96px 1fr 102px; }
+  #tl { height: 200px; }
+  #jp { aspect-ratio: 4 / 3; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="kicker">Companion to the <a href="https://huggingface.co/learn/robotics-course/unit1/4" target="_blank" rel="noopener">Hugging Face Robotics Course</a> · Unit 1</div>
+      <h1><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 50 L30 34" stroke="var(--link1)" stroke-width="7" stroke-linecap="round"/><path d="M30 34 L50 16" stroke="var(--link2)" stroke-width="7" stroke-linecap="round"/><circle cx="14" cy="50" r="5" fill="var(--bg)"/><circle cx="30" cy="34" r="5" fill="var(--bg)"/></svg>Arm Playground · Datasets</h1>
+      <p>How <code>LeRobotDataset</code> turns one frame index into a <b>temporal window</b>. <code>delta_timestamps</code> lists offsets in seconds; each one becomes a frame index, gets clamped to its episode, and comes back stacked in a tensor. Drag <b>t</b>, edit the offsets, and watch the sample change.</p>
+    </div>
+    <div class="actions">
+      <button id="copy" title="Copy a link to exactly this window and frame">🔗 Copy link</button>
+      <button id="theme" title="Toggle light/dark" aria-label="Toggle light or dark theme">◐</button>
+    </div>
+  </div>
+
+  <nav class="tabs" aria-label="Pages">
+    <span class="tab" aria-current="page">Unit 1 · Datasets in practice</span>
+    <a class="tab" href="index.html">Unit 2 · Arm playground →</a>
+  </nav>
+
+  <div class="grid">
+    <section class="card area-tl">
+      <h2><span>Episode timeline · which frames <code>dataset[i]</code> fetches</span><span class="pills" id="tlStatus"></span></h2>
+      <canvas id="tl" aria-label="Timeline of one 240-frame episode with the current frame t and the fetched observation and action frames; drag to move t"></canvas>
+      <div class="ctl wide"><label for="tS">Current frame t</label><input type="range" id="tS" min="0" max="239" step="1" value="100" aria-label="Current frame t"><output id="tSo"></output></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--link1)"></span>observation.images.up (top half)</span>
+        <span><span class="sw" style="background:var(--link2)"></span>action (bottom half)</span>
+        <span><span class="sw hatch"></span>raw index outside the episode → clamped to the edge, is_pad = True</span>
+        <span>drag the strip or a cell · slider · <kbd>←</kbd><kbd>→</kbd> on the slider</span>
+      </div>
+      <div id="fetch"></div>
+    </section>
+
+    <section class="card lesson area-lesson" id="lesson" aria-live="polite">
+      <h2><span>Lesson · temporal windows</span><span id="lsCount"></span></h2>
+      <div class="dots" id="lsDots"></div>
+      <h3 id="lsTitle"></h3>
+      <div class="lbody" id="lsBody"></div>
+      <div id="lsAsk"></div>
+      <div class="row">
+        <button id="lsPrev">← Back</button>
+        <button id="lsSetup" class="ghost" title="Put the window and t back to this step's starting setup">↺ Reset this step</button>
+        <button id="lsNext" class="primary">Next →</button>
+      </div>
+      <details class="more"><summary>More experiments for free play</summary><ol id="more"></ol></details>
+    </section>
+
+    <section class="card area-editor">
+      <h2><span>Window editor · <code>delta_timestamps</code></span><span class="pills"><span class="pill dim">fps = 30 · tolerance_s = 1e-4</span></span></h2>
+      <div class="row" style="margin-top:0">
+        <span class="sub" style="margin:0">Course recipes:</span>
+        <button class="small" data-preset="basic" title='images [0.0] · action [0.0]'>Basic BC</button>
+        <button class="small" data-preset="history" title='images [-0.2, -0.1, 0.0] · action [0.0]'>History BC</button>
+        <button class="small" data-preset="chunk" title='images [-0.1, 0.0] · action [0.0, 0.1, 0.2, 0.3]'>Action chunking</button>
+      </div>
+      <div class="win">
+        <div class="winhead"><span class="fname obs">observation.images.up</span><span class="sub">camera frames · seconds relative to t · negative = past</span></div>
+        <div class="chips" id="obsChips"></div>
+        <div class="err hidden" id="obsErr"></div>
+      </div>
+      <div class="win">
+        <div class="winhead"><span class="fname act">action</span><span class="sub">commanded joint targets · positive = future</span></div>
+        <div class="chips" id="actChips"></div>
+        <div class="err hidden" id="actErr"></div>
+      </div>
+      <p class="sub" style="margin-top:12px">Each offset is converted with <code>round(offset × fps)</code> and must be a multiple of 1/30 s ≈ 0.0333 s, within <code>tolerance_s = 1e-4</code>, or the dataset refuses to build. Order is kept: the stacked tensor follows the list. Keys you leave out of <code>delta_timestamps</code> come back as a single frame with no extra dimension.</p>
+    </section>
+
+    <section class="card area-sample">
+      <h2>The sample, live</h2>
+      <div class="math" id="sample"></div>
+      <details class="more" id="key"><summary>What do the symbols mean?</summary>
+        <dl>
+          <dt>t</dt><dd>The frame you asked for. <code>dataset[i]</code> picks one row of the whole dataset; on this page t is that row's position inside episode 17 (0 … 239).</dd>
+          <dt>offset</dt><dd>One entry of <code>delta_timestamps</code>, in seconds relative to t. Negative is the past, positive the future, 0.0 is t itself. It has to be a whole number of frames.</dd>
+          <dt>index</dt><dd>The row that offset turns into: <code>t + round(offset × fps)</code> (the "raw" index), then clamped to the episode's first and last frame (the "used" index). It never crosses into a neighbouring episode.</dd>
+          <dt>is_pad</dt><dd>One boolean per offset, returned as <code>{feature}_is_pad</code>. True when the raw index fell outside the episode, so the frame you got is a copy of the episode's first or last frame. Loss functions should mask those rows.</dd>
+          <dt>fps</dt><dd>Frames per second of the recording, 30 for this dataset. 1/fps ≈ 0.0333 s is the finest offset you can request; 0.05 s is 1.5 frames and is rejected.</dd>
+          <dt>batch</dt><dd>A PyTorch DataLoader stacks B samples along a new first dimension, so every shape gains a leading B (16 here).</dd>
+        </dl>
+      </details>
+    </section>
+
+    <section class="card area-plot">
+      <h2><span>Joint traces · the six <code>action</code> values over the episode</span><span class="pills"><span class="pill dim">synthetic pick-and-place</span></span></h2>
+      <canvas id="jp" aria-label="Six action joint traces over the episode with the fetched action steps marked"></canvas>
+      <div class="legend" id="jpLegend"></div>
+    </section>
+
+    <section class="card area-code">
+      <h2><span>Python · lerobot 0.6.1</span><button id="copyCode" class="small" title="Copy this code">⧉ Copy</button></h2>
+      <div class="math" id="code"></div>
+    </section>
+
+    <section class="card area-facts">
+      <h2><span>Dataset · <code>lerobot/svla_so101_pickplace</code></span></h2>
+      <table class="facts">
+        <tr><td>episodes · frames · fps</td><td>50 episodes · 11,939 frames · 30 fps, so ≈ 239 frames ≈ 8 s per episode. This page uses one 240-frame stand-in episode.</td></tr>
+        <tr><td>action</td><td>float32 [6]: shoulder_pan.pos, shoulder_lift.pos, elbow_flex.pos, wrist_flex.pos, wrist_roll.pos, gripper.pos. The commanded target sent to the follower arm.</td></tr>
+        <tr><td>observation.state</td><td>float32 [6], same six names. The measured position, i.e. where the arm actually is.</td></tr>
+        <tr><td>observation.images.up<br>observation.images.side</td><td>Two cameras, video, 480 × 640 × 3 each. Decoded on the fly to [3, 480, 640] tensors.</td></tr>
+        <tr><td>timestamp · frame_index<br>episode_index · index · task_index</td><td>Bookkeeping per row: seconds within the episode, frame number within the episode, which episode, the global row id, which task string.</td></tr>
+        <tr><td>install</td><td><code>pip install "lerobot[dataset]"</code> (Python ≥ 3.12), then <code>from lerobot.datasets.lerobot_dataset import LeRobotDataset</code>.</td></tr>
+      </table>
+    </section>
+  </div>
+
+  <footer>
+    <span>Unofficial companion to <a href="https://huggingface.co/learn/robotics-course/unit1/4" target="_blank" rel="noopener">Unit 1 · Datasets in practice</a> of the Hugging Face Robotics Course. Not affiliated with Hugging Face.</span>
+    <span>MIT License · <a href="https://github.com/bakulbadwal/arm-playground" target="_blank" rel="noopener">Source on GitHub</a></span>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// ================= helpers =================
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+let cssCache = {};
+const css = (name) => (cssCache[name] ??= getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+const store = { get(k, d) { try { const v = localStorage.getItem("armpg:" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem("armpg:" + k, JSON.stringify(v)); } catch (e) {} } };
+function hexToRgb(h) {
+  if (h.startsWith("rgb")) return h.match(/[\d.]+/g).slice(0, 3).map(Number);
+  h = h.replace("#", ""); if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+}
+const rgba = (name, a) => { const [r, g, b] = hexToRgb(css(name)); return `rgba(${r},${g},${b},${a})`; };
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+let toastT = 0; function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2600); }
+
+// ================= the dataset (facts) and the rule =================
+const FPS = 30, EP_LEN = 240, EP = 17, TOL = 1e-4, SLIVER = 20, BATCH = 16;
+const JOINTS = ["shoulder_pan.pos", "shoulder_lift.pos", "elbow_flex.pos", "wrist_flex.pos", "wrist_roll.pos", "gripper.pos"];
+const PRESETS = { basic: { obs: [0], act: [0] }, history: { obs: [-0.2, -0.1, 0], act: [0] }, chunk: { obs: [-0.1, 0], act: [0, 0.1, 0.2, 0.3] } };
+const S = { t: 100, obs: [0], act: [0] };
+// lerobot: delta_indices = round(delta * fps); check_delta_timestamps: |ts*fps − round(ts*fps)| / fps ≤ tolerance_s
+const toFrames = (d) => Math.round(d * FPS);
+const isWhole = (d) => Math.abs(d * FPS - Math.round(d * FPS)) / FPS <= TOL;
+const badOffsets = (list) => list.filter((d) => !isWhole(d));
+// lerobot _get_query_indices: idx = clamp(t + delta, ep_start, ep_end − 1); is_pad = raw index outside [ep_start, ep_end)
+function fetchWindow(list, t) {
+  return list.filter(isWhole).map((d) => { const di = toFrames(d), raw = t + di, used = clamp(raw, 0, EP_LEN - 1); return { d, di, raw, used, pad: raw < 0 || raw >= EP_LEN }; });
+}
+const pyNum = (d) => (Number.isInteger(d) ? d.toFixed(1) : String(+d.toFixed(4)));
+const fmtS = (d) => (d < 0 ? "−" : d > 0 ? "+" : "") + String(+Math.abs(d).toFixed(4)) + " s";
+const fmtFr = (di) => (di > 0 ? "+" : "") + di + " fr";
+const pyList = (list) => "[" + list.map(pyNum).join(", ") + "]";
+const pyBool = (W) => "[" + W.map((o) => (o.pad ? "True" : "False")).join(", ") + "]";
+
+// ================= synthetic pick-and-place traces =================
+const ss = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+const seg = (s, a, b) => ss((s - a) / (b - a));
+const bump = (s, c, w) => Math.exp(-(((s - c) / w) ** 2));
+function traceAt(f) { // normalised motor positions (−100…100), deterministic
+  const s = f / (EP_LEN - 1), reach1 = bump(s, 0.30, 0.10), reach2 = bump(s, 0.74, 0.10), carry = seg(s, 0.40, 0.62), lift = 4 * carry * (1 - carry);
+  return [
+    -22 + 58 * carry + 1.5 * Math.sin(s * 23),          // shoulder_pan: swings from the pick site to the place site
+    -78 + 62 * reach1 + 58 * reach2 + 6 * lift,          // shoulder_lift: rests high, dips down to pick and to place
+    88 - 55 * reach1 - 50 * reach2 - 8 * lift,           // elbow_flex: opens as the arm reaches
+    15 + 30 * reach1 + 26 * reach2,                      // wrist_flex
+    -4 + 10 * carry + 2 * Math.sin(s * 17),              // wrist_roll: nearly still
+    s < 0.5 ? 42 - 36 * seg(s, 0.31, 0.37) : 6 + 36 * seg(s, 0.78, 0.84), // gripper: open, closes on the object, opens to release
+  ];
+}
+const TRACE = Array.from({ length: EP_LEN }, (_, f) => traceAt(f));
+
+// ================= canvases =================
+const tl = $("tl"), jp = $("jp");
+function fit(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
+}
+let hatchCache = {};
+function hatch(color) {
+  if (hatchCache[color]) return hatchCache[color];
+  const c = document.createElement("canvas"); c.width = c.height = 8; const g = c.getContext("2d");
+  g.strokeStyle = color; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-2, 6); g.lineTo(6, -2); g.moveTo(2, 10); g.lineTo(10, 2); g.stroke();
+  return (hatchCache[color] = c);
+}
+function arrowHead(ctx, x, y, ang, size, color) {
+  ctx.save(); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.lineTo(x - size * Math.cos(ang - 0.45), y - size * Math.sin(ang - 0.45)); ctx.lineTo(x - size * Math.cos(ang + 0.45), y - size * Math.sin(ang + 0.45));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+const MONO = "11px ui-monospace, Menlo, monospace", MONOB = "bold 11px ui-monospace, Menlo, monospace";
+
+// layout of the timeline, refreshed on every draw (pointer handlers read it)
+const TL = { w: 0, ppf: 1, sx: 0, sy: 30, sh: 32, zx: 0, zy: 118, zh: 48, cellW: 24, first: 0, K: 0 };
+function drawTimeline() {
+  const { ctx, w, h } = fit(tl); ctx.clearRect(0, 0, w, h);
+  const ppf = w / (EP_LEN + 2 * SLIVER), sx = SLIVER * ppf, sy = 30, sh = 32; Object.assign(TL, { w, ppf, sx, sy, sh });
+  const fx = (f) => sx + f * ppf, fc = (f) => sx + (f + 0.5) * ppf, narrow = w < 640;
+  const obsW = fetchWindow(S.obs, S.t), actW = fetchWindow(S.act, S.t);
+  const lineHatch = ctx.createPattern(hatch(css("--line")), "repeat"), redHatch = ctx.createPattern(hatch(css("--bad")), "repeat");
+  // ---- full strip: neighbours greyed + hatched, episode 17 plain
+  ctx.fillStyle = css("--chip"); ctx.fillRect(0, sy, w, sh);
+  ctx.fillStyle = lineHatch; ctx.fillRect(0, sy, sx, sh); ctx.fillRect(fx(EP_LEN), sy, w - fx(EP_LEN), sh);
+  ctx.fillStyle = css("--grid"); ctx.fillRect(sx, sy, EP_LEN * ppf, sh);
+  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+  for (let f = 30; f < EP_LEN; f += 30) { ctx.beginPath(); ctx.moveTo(Math.round(fx(f)) + 0.5, sy); ctx.lineTo(Math.round(fx(f)) + 0.5, sy + sh); ctx.stroke(); }
+  ctx.strokeRect(sx + 0.5, sy + 0.5, EP_LEN * ppf - 1, sh - 1);
+  // headers
+  ctx.font = MONO; ctx.textBaseline = "alphabetic"; ctx.fillStyle = css("--muted");
+  ctx.textAlign = "left"; ctx.fillText(narrow ? "ep 16" : "← episode 16", 2, 11);
+  ctx.textAlign = "right"; ctx.fillText(narrow ? "ep 18" : "episode 18 →", w - 2, 11);
+  ctx.textAlign = "center"; ctx.fillStyle = css("--ink"); ctx.fillText(narrow ? "episode 17 · 240 frames" : "episode 17 · 240 frames · 8.0 s at 30 fps", w / 2, 11);
+  // window ticks on the strip: top half = observation, bottom half = action
+  const tick = (f, half, style) => { ctx.fillStyle = style; ctx.fillRect(fx(f), sy + (half ? sh / 2 : 0) + 1, Math.max(2, ppf), sh / 2 - 2); };
+  for (const o of obsW) { if (o.pad) tick(o.raw, 0, redHatch); tick(o.used, 0, css("--link1")); }
+  for (const a of actW) { if (a.pad) tick(a.raw, 1, redHatch); tick(a.used, 1, css("--link2")); }
+  // time axis: seconds and frame indices
+  const every = ppf * 30 < 44 ? 2 : 1; ctx.strokeStyle = css("--line"); ctx.textAlign = "center";
+  for (let s = 0; s <= 8; s++) {
+    const x = Math.round(fx(s * 30)) + 0.5; ctx.beginPath(); ctx.moveTo(x, sy + sh); ctx.lineTo(x, sy + sh + 5); ctx.stroke();
+    if (s % every) continue;
+    ctx.fillStyle = css("--muted"); ctx.fillText(s + " s", x, sy + sh + 17);
+    ctx.fillStyle = css("--ghost"); ctx.fillText(s === 8 ? "end" : "f" + s * 30, x, sy + sh + 29);
+  }
+  // ---- zoom band: cells around the window
+  const all = [...obsW, ...actW];
+  let lo = Math.min(-6, ...all.map((x) => x.di)) - 1, hi = Math.max(6, ...all.map((x) => x.di)) + 1;
+  const maxCells = Math.max(9, Math.floor(w / 24)) | 1;
+  let K = hi - lo + 1, first = S.t + lo;
+  if (K > maxCells) { const mid = Math.round((lo + hi) / 2); K = maxCells; first = S.t + mid - Math.floor(K / 2); }
+  const cellW = Math.min(64, w / K), zx = (w - cellW * K) / 2, zy = 118, zh = 48; Object.assign(TL, { zx, zy, zh, cellW, first, K });
+  const cx = (f) => zx + (f - first + 0.5) * cellW, inBand = (f) => f >= first && f < first + K;
+  // connector from the strip to the band
+  ctx.fillStyle = rgba("--accent", 0.07); ctx.beginPath(); ctx.moveTo(fx(first), sy + sh); ctx.lineTo(fx(first + K), sy + sh); ctx.lineTo(zx + cellW * K, zy); ctx.lineTo(zx, zy); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = rgba("--accent", 0.55); ctx.setLineDash([3, 3]); ctx.strokeRect(fx(first) + 0.5, sy - 1.5, K * ppf, sh + 3); ctx.setLineDash([]);
+  // cells
+  ctx.font = MONO; ctx.textAlign = "center";
+  for (let i = 0; i < K; i++) {
+    const f = first + i, x = zx + i * cellW, inEp = f >= 0 && f < EP_LEN;
+    ctx.fillStyle = inEp ? css("--grid") : css("--chip"); ctx.fillRect(x, zy, cellW, zh);
+    if (!inEp) { ctx.fillStyle = lineHatch; ctx.fillRect(x, zy, cellW, zh); }
+    ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, zy + 0.5, cellW - 1, zh - 1);
+    ctx.fillStyle = inEp ? css("--muted") : css("--ghost");
+    if (cellW >= 30 || i % 2 === 0) ctx.fillText(String(f), x + cellW / 2, zy + zh + 13);
+  }
+  // captions for the neighbouring-episode runs
+  const runs = [[first, Math.min(first + K, 0), "episode 16"], [Math.max(first, EP_LEN), first + K, "episode 18"]];
+  ctx.fillStyle = css("--ghost");
+  for (const [a, b, txt] of runs) if (b > a && (b - a) * cellW >= 46) ctx.fillText((b - a) * cellW < 76 ? txt.replace("episode ", "ep ") : txt, zx + (b - first) * cellW - (b - a) * cellW / 2, zy - 5);
+  // fills: used frames solid, raw frames outside the episode hatched red, then an arrow back to the edge
+  const fill = (f, half, style) => { if (!inBand(f)) return; ctx.fillStyle = style; ctx.fillRect(zx + (f - first) * cellW + 1, zy + (half ? zh / 2 : 0) + 1, cellW - 2, zh / 2 - 2); };
+  const arc = (o, half, k) => { if (!inBand(o.raw) || !inBand(o.used)) return; const y = zy + (half ? 3 * zh / 4 : zh / 4), x0 = cx(o.raw), x1 = cx(o.used), lift = (half ? 1 : -1) * (7 + 3 * k);
+    ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.quadraticCurveTo((x0 + x1) / 2, y + lift, x1, y); ctx.stroke();
+    arrowHead(ctx, x1, y, Math.atan2(y - (y + lift), x1 - (x0 + x1) / 2), 7, css("--bad")); };
+  const sideMark = (o, half, colorName) => { if (inBand(o.used)) return; const left = o.used < first, x = left ? zx + 4 : zx + K * cellW - 4, y = zy + (half ? 3 * zh / 4 : zh / 4);
+    ctx.fillStyle = css(colorName); ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); ctx.lineTo(x + (left ? -1 : 1) * 6, y); ctx.closePath(); ctx.fill();
+    ctx.textAlign = left ? "left" : "right"; ctx.fillText(fmtFr(o.di), x + (left ? 9 : -9), y + 4); ctx.textAlign = "center"; };
+  for (const o of obsW) { if (o.pad) fill(o.raw, 0, redHatch); fill(o.used, 0, css("--link1")); sideMark(o, 0, "--link1"); }
+  for (const a of actW) { if (a.pad) fill(a.raw, 1, redHatch); fill(a.used, 1, css("--link2")); sideMark(a, 1, "--link2"); }
+  obsW.filter((o) => o.pad).forEach((o, k) => arc(o, 0, k)); actW.filter((a) => a.pad).forEach((a, k) => arc(a, 1, k));
+  // offset labels inside the cells (when there is room)
+  if (cellW >= 34) { ctx.font = MONO; ctx.fillStyle = css("--panel");
+    for (const o of obsW) if (!o.pad && inBand(o.used)) ctx.fillText(pyNum(o.d), cx(o.used), zy + zh / 4 + 4);
+    for (const a of actW) if (!a.pad && inBand(a.used)) ctx.fillText(pyNum(a.d), cx(a.used), zy + 3 * zh / 4 + 4); }
+  // current frame t: outline its cell, and the marker on the strip
+  if (inBand(S.t)) { ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.strokeRect(zx + (S.t - first) * cellW + 1, zy + 1, cellW - 2, zh - 2);
+    ctx.font = MONOB; ctx.fillStyle = css("--ink"); ctx.fillText("t", cx(S.t), zy - 5); }
+  const mx = fc(S.t); ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx, sy - 3); ctx.lineTo(mx, sy + sh + 4); ctx.stroke();
+  ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.moveTo(mx - 6, sy - 11); ctx.lineTo(mx + 6, sy - 11); ctx.lineTo(mx, sy - 3); ctx.closePath(); ctx.fill();
+  ctx.font = MONOB; const right = mx > w - 110; ctx.textAlign = right ? "right" : "left";
+  ctx.fillText(`t = ${S.t}  (${(S.t / FPS).toFixed(2)} s)`, mx + (right ? -10 : 10), sy - 4);
+}
+
+function drawJoints() {
+  const { ctx, w, h } = fit(jp); ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--chip"); ctx.fillRect(0, 0, w, h);
+  const pl = 38, pr = 10, pt = 24, pb = 44, W = w - pl - pr, H = h - pt - pb;
+  const X = (f) => pl + (f / EP_LEN) * W, Xc = (f) => X(f + 0.5), Y = (v) => pt + (1 - (v + 100) / 200) * H;
+  const obsW = fetchWindow(S.obs, S.t), actW = fetchWindow(S.act, S.t);
+  const span = (list, name) => { if (!list.length) return; const a = Math.min(...list.map((x) => x.used)), b = Math.max(...list.map((x) => x.used)); ctx.fillStyle = rgba(name, 0.12); ctx.fillRect(X(a), pt, X(b + 1) - X(a), H); };
+  span(obsW, "--link1"); span(actW, "--link2");
+  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.font = MONO; ctx.fillStyle = css("--muted"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const v of [-100, -50, 0, 50, 100]) { const y = Math.round(Y(v)) + 0.5; ctx.beginPath(); ctx.moveTo(pl, y); ctx.lineTo(w - pr, y); ctx.stroke(); ctx.fillText(String(v), pl - 5, y); }
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  for (let s = 0; s <= 8; s++) { const x = Math.round(X(s * 30)) + 0.5; ctx.beginPath(); ctx.moveTo(x, pt); ctx.lineTo(x, pt + H); ctx.stroke(); if (w > 420 || s % 2 === 0) ctx.fillText(s + " s", x, pt + H + 14); }
+  ctx.save(); ctx.translate(11, pt + H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("position (normalised)", 0, 0); ctx.restore();
+  const COLORS = ["--link1", "--link2", "--target", "--shelf", "--floor", "--ink"];
+  ctx.lineJoin = "round";
+  for (let j = 0; j < 6; j++) { ctx.strokeStyle = css(COLORS[j]); ctx.lineWidth = j === 5 ? 2.2 : 1.6; ctx.globalAlpha = 0.9; ctx.beginPath();
+    for (let f = 0; f < EP_LEN; f++) { const v = TRACE[f][j]; f ? ctx.lineTo(Xc(f), Y(v)) : ctx.moveTo(Xc(f), Y(v)); } ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  // t
+  ctx.strokeStyle = css("--ink"); ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(Xc(S.t), pt - 2); ctx.lineTo(Xc(S.t), pt + H); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = MONOB; ctx.fillStyle = css("--ink"); ctx.textAlign = Xc(S.t) > w - 60 ? "right" : "left"; ctx.fillText("t = " + S.t, Xc(S.t) + (Xc(S.t) > w - 60 ? -5 : 5), pt - 12);
+  // camera frames fetched: ticks along the top
+  for (const o of obsW) { ctx.fillStyle = css("--link1"); ctx.fillRect(Xc(o.used) - 2.5, pt - 9, 5, 8); if (o.pad) { ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.5; ctx.strokeRect(Xc(o.used) - 3.5, pt - 10, 7, 10); } }
+  // action steps fetched: dots on every curve
+  for (const a of actW) for (let j = 0; j < 6; j++) { const x = Xc(a.used), y = Y(TRACE[a.used][j]);
+    ctx.beginPath(); ctx.arc(x, y, 3.6, 0, 7); ctx.fillStyle = css("--link2"); ctx.fill(); ctx.lineWidth = a.pad ? 2 : 1.5; ctx.strokeStyle = a.pad ? css("--bad") : css("--panel"); ctx.stroke(); }
+  // bracket under the axis for the action window
+  if (actW.length >= 2) { const a = Math.min(...actW.map((x) => x.di)), b = Math.max(...actW.map((x) => x.di)), y = pt + H + 24;
+    const lo = Math.min(...actW.map((x) => x.used)), hi = Math.max(...actW.map((x) => x.used)), X0 = Xc(lo), X1 = Xc(hi);
+    ctx.strokeStyle = css("--link2"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X0, y - 4); ctx.lineTo(X0, y); ctx.lineTo(X1, y); ctx.lineTo(X1, y - 4); ctx.stroke();
+    ctx.font = MONO; ctx.fillStyle = css("--link2"); ctx.textAlign = "center";
+    const span = ((b - a) / FPS).toFixed(2), label = a >= 0 ? (w < 520 ? `next ${span} s of the plan` : `action chunk: the next ${span} s of the plan`) : `action window: ${(a / FPS).toFixed(2)} s … +${(b / FPS).toFixed(2)} s`;
+    const tw = ctx.measureText(label).width; ctx.fillText(label, clamp((X0 + X1) / 2, pl + tw / 2, w - pr - tw / 2), y + 13); }
+  $("jpLegend").innerHTML = JOINTS.map((n, j) => `<span><span class="sw" style="background:var(${COLORS[j]})"></span>${n}</span>`).join("") +
+    `<span><span class="sw" style="background:var(--link2);border-radius:50%"></span>fetched action step (red ring = padded copy)</span><span><span class="sw" style="background:var(--link1)"></span>ticks on top: camera frames fetched</span>`;
+}
+
+// ================= panels =================
+function renderFetch() {
+  const rows = [["observation.images.up", S.obs, "obs"], ["action", S.act, "act"]];
+  $("fetch").innerHTML = rows.map(([name, list, cls]) => {
+    const W = fetchWindow(list, S.t), bad = badOffsets(list);
+    const chips = W.map((o) => `<span class="fchip ${cls}${o.pad ? " pad" : ""}"><b>${fmtS(o.d)}</b><span class="dim">${fmtFr(o.di)}</span>→ raw <b>${o.raw}</b> → used <b>${o.used}</b>${o.pad ? '<span class="pill bad">is_pad True</span>' : '<span class="pill dim">is_pad False</span>'}</span>`).join("");
+    const badc = bad.map((d) => `<span class="fchip bad"><b>${fmtS(d)}</b> = ${+(d * FPS).toFixed(3)} frames <span class="pill bad">rejected</span></span>`).join("");
+    return `<div class="frow"><span class="fname ${cls}">${name}</span>${chips}${badc}${list.length ? "" : '<span class="sub" style="margin:0">not in delta_timestamps → just frame t, no window</span>'}</div>`;
+  }).join("");
+  const nPad = [...fetchWindow(S.obs, S.t), ...fetchWindow(S.act, S.t)].filter((o) => o.pad).length, nBad = badOffsets(S.obs).length + badOffsets(S.act).length;
+  $("tlStatus").innerHTML = `<span class="pill dim">${fetchWindow(S.obs, S.t).length} obs · ${fetchWindow(S.act, S.t).length} act</span>` +
+    (nPad ? `<span class="pill bad">${nPad} padded</span>` : "") + (nBad ? `<span class="pill bad">${nBad} offset${nBad > 1 ? "s" : ""} rejected</span>` : "");
+}
+function renderEditor() {
+  for (const [key, id, cls, fname] of [["obs", "obsChips", "obs", "observation.images.up"], ["act", "actChips", "act", "action"]]) {
+    const list = S[key], box = $(id);
+    box.innerHTML = list.map((d, i) => { const ok = isWhole(d);
+      return `<span class="offchip ${cls}${ok ? "" : " bad"}"><b>${pyNum(d)}</b><i>${ok ? fmtFr(toFrames(d)) : +(d * FPS).toFixed(3) + " fr ✗"}</i><button type="button" data-i="${i}" aria-label="Remove offset ${pyNum(d)}" title="Remove">✕</button></span>`; }).join("") +
+      `<form class="addoff" data-key="${key}"><input type="number" step="any" placeholder="+ add offset (s)" aria-label="Add an offset in seconds to ${fname}"><button type="submit" class="small">Add</button></form>`;
+    box.querySelectorAll(".offchip button").forEach((b) => b.addEventListener("click", () => { S[key].splice(+b.dataset.i, 1); renderEditor(); render(); }));
+    box.querySelector("form").addEventListener("submit", (e) => {
+      e.preventDefault(); const inp = e.target.querySelector("input"), v = parseFloat(inp.value);
+      if (isNaN(v)) { toast("Type an offset in seconds, e.g. -0.1"); inp.focus(); return; }
+      if (S[key].some((x) => Math.abs(x - v) < 1e-9)) { toast(`${pyNum(v)} is already in the list`); inp.select(); return; }
+      S[key].push(v); renderEditor(); render(); box.querySelector("input").focus();
+      if (!isWhole(v)) toast(`${pyNum(v)} s is ${+(v * FPS).toFixed(3)} frames: LeRobot rejects it`);
+    });
+    const bad = badOffsets(list), err = $(key + "Err"); err.classList.toggle("hidden", !bad.length);
+    if (bad.length) err.textContent = `ValueError: The following delta_timestamps are found outside of tolerance range.\nPlease make sure they are multiples of 1/${FPS} +/- tolerance and adjust their values accordingly.\n{'${fname}': [${bad.map(pyNum).join(", ")}]}`;
+  }
+}
+function renderSample() {
+  const obsW = fetchWindow(S.obs, S.t), actW = fetchWindow(S.act, S.t), nO = obsW.length, nA = actW.length;
+  // key column 30 wide, value column 20 wide; a note goes on the same line only if the line stays ≤ 76 characters
+  const line = (k, v, note) => { const head = k.padEnd(30) + v.padEnd(20), fits = !note || head.length + note.length + 4 <= 76;
+    return esc(head).replace(/\bTrue\b/g, '<span class="padT">True</span>') + (note ? (fits ? "  " : "\n" + " ".repeat(30)) + `<span class="dim"># ${esc(note)}</span>` : ""); };
+  const nPadO = obsW.filter((o) => o.pad).length, nPadA = actW.filter((a) => a.pad).length, L = [];
+  L.push(`<span class="dim"># sample = dataset[i]           frame t = ${S.t} of episode ${EP}, no batch dim</span>`);
+  L.push(line("observation.images.up", nO >= 2 ? `[${nO}, 3, 480, 640]` : "[3, 480, 640]", nO >= 2 ? `${nO} offsets × (C, H, W)` : nO === 1 ? "1 offset: video is squeezed to one frame" : "no window → one frame"));
+  if (nO) L.push(line("observation.images.up_is_pad", pyBool(obsW), nPadO ? `${nPadO} = copies of the edge frame` : ""));
+  L.push(line("observation.images.side", "[3, 480, 640]", "no window → one frame"));
+  L.push(line("observation.state", "[6]", "measured, at t only"));
+  L.push(line("action", nA ? `[${nA}, 6]` : "[6]", nA ? `${nA} offset${nA > 1 ? "s" : ""} × 6 motors` : "no window → one row"));
+  if (nA) L.push(line("action_is_pad", pyBool(actW), nPadA ? `${nPadA} padded → mask them` : ""));
+  L.push(line("timestamp", (S.t / FPS).toFixed(3), "= t / fps"));
+  L.push(line("frame_index · episode_index", `${S.t} · ${EP}`, ""));
+  L.push(line("index · task_index · task", "…", "global row · task"));
+  L.push("");
+  L.push(`<span class="dim"># DataLoader(dataset, batch_size=${BATCH}) → same keys, batch dim first</span>`);
+  L.push(line("observation.images.up", nO >= 2 ? `[${BATCH}, ${nO}, 3, 480, 640]` : `[${BATCH}, 3, 480, 640]`, ""));
+  if (nO) L.push(line("observation.images.up_is_pad", `[${BATCH}, ${nO}]`, "bool"));
+  L.push(line("action", nA ? `[${BATCH}, ${nA}, 6]` : `[${BATCH}, 6]`, ""));
+  if (nA) L.push(line("action_is_pad", `[${BATCH}, ${nA}]`, "bool"));
+  $("sample").innerHTML = L.join("\n");
+}
+let CODE = "";
+function renderCode() {
+  const obsW = fetchWindow(S.obs, S.t), actW = fetchWindow(S.act, S.t), badO = badOffsets(S.obs), badA = badOffsets(S.act), nO = obsW.length, nA = actW.length;
+  const badNote = (bad) => (bad.length ? `  # ValueError at construction: ${bad.map((d) => `${pyNum(d)} s = ${+(d * FPS).toFixed(3)} frames`).join(", ")}` : "");
+  const entries = [];
+  if (S.obs.length) entries.push(`    "observation.images.up": ${pyList(S.obs)},${badNote(badO)}`);
+  if (S.act.length) entries.push(`    "action": ${pyList(S.act)},${badNote(badA)}`);
+  const dt = entries.length ? `delta_timestamps = {\n${entries.join("\n")}\n}  # seconds relative to the sampled frame, each a whole number of frames at 30 fps` : `delta_timestamps = None  # no windows: every key comes back as a single frame`;
+  const pad = " ".repeat(String(S.t).length + 6);
+  CODE = `# pip install "lerobot[dataset]"      # lerobot 0.6.1, Python >= 3.12
+from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+${dt}
+
+dataset = LeRobotDataset("lerobot/svla_so101_pickplace", delta_timestamps=delta_timestamps)
+print(dataset.fps, dataset.num_episodes, dataset.num_frames)   # 30 50 11939
+
+i = ${S.t}   # dataset[i] takes a GLOBAL row index: row ${S.t} is frame ${S.t} of episode 0.
+${pad}# For frame ${S.t} of episode ${EP}: i = dataset.meta.episodes[${EP}]["dataset_from_index"] + ${S.t}
+sample = dataset[i]
+sample["observation.images.up"].shape   # torch.Size(${nO >= 2 ? `[${nO}, 3, 480, 640]` : "[3, 480, 640]"})${nO >= 2 ? "" : nO === 1 ? "  (one offset: video frames are squeezed)" : "  (not in delta_timestamps)"}
+${nO ? `sample["observation.images.up_is_pad"]  # tensor(${pyBool(obsW)})` : `# no "observation.images.up_is_pad" key without a window`}
+sample["action"].shape                  # torch.Size(${nA ? `[${nA}, 6]` : "[6]"})${nA ? "" : "  (not in delta_timestamps)"}
+${nA ? `sample["action_is_pad"]                 # tensor(${pyBool(actW)})` : `# no "action_is_pad" key without a window`}
+
+# Batches: a DataLoader prepends the batch dimension
+from torch.utils.data import DataLoader
+loader = DataLoader(dataset, batch_size=${BATCH}, shuffle=True)
+batch = next(iter(loader))
+batch["observation.images.up"].shape    # torch.Size(${nO >= 2 ? `[${BATCH}, ${nO}, 3, 480, 640]` : `[${BATCH}, 3, 480, 640]`})
+batch["action"].shape                   # torch.Size(${nA ? `[${BATCH}, ${nA}, 6]` : `[${BATCH}, 6]`})
+
+# Streaming variant: an IterableDataset, so streaming_dataset[100] raises TypeError (no __getitem__)
+# from lerobot.datasets.streaming_dataset import StreamingLeRobotDataset
+# streaming_dataset = StreamingLeRobotDataset("lerobot/svla_so101_pickplace", delta_timestamps=delta_timestamps)
+# sample = next(iter(streaming_dataset))   # shuffle=True, buffer_size=1000 by default
+`;
+  $("code").innerHTML = CODE.split("\n").map((ln) => { const m = ln.match(/^(.*?)(\s*#.*)?$/); return esc(m[1]) + (m[2] ? `<span class="dim">${esc(m[2])}</span>` : ""); }).join("\n");
+}
+function syncT() { $("tS").value = S.t; $("tSo").textContent = `${S.t} · ${(S.t / FPS).toFixed(2)} s`; }
+function render() { drawTimeline(); drawJoints(); renderFetch(); renderSample(); renderCode(); syncT(); }
+function setT(f) { f = clamp(Math.round(f), 0, EP_LEN - 1); if (f === S.t) return; S.t = f; render(); }
+
+// ================= lessons =================
+const L = [
+  { t: "A frame is 1/30 s", setup: { t: 100, obs: [0], act: [0] },
+    b: `<p>This dataset was recorded at <b>30 fps</b>: 50 episodes, 11,939 frames, about 239 frames or 8 s each. The strip above is one episode, and <b>t</b> is the frame you asked for with <code>dataset[i]</code>.</p><p><code>delta_timestamps</code> speaks in <b>seconds</b>, but the dataset stores <b>frames</b>, so LeRobot converts every offset with <code>round(offset × fps)</code> before it fetches anything. With the Basic BC recipe, both lists are just <code>[0.0]</code>: the frame at t and nothing else.</p>`,
+    ask: { type: "num", q: "How many frames is an offset of 0.1 s at 30 fps?", a: 3, tol: 0.01, why: "0.1 × 30 = 3. So −0.1 s means 'three frames back', and the finest offset you can ask for is 1/30 ≈ 0.0333 s." } },
+  { t: "History window", setup: { t: 100, obs: [-0.2, -0.1, 0], act: [0] },
+    b: `<p>The History BC recipe asks the camera for three frames: <code>observation.images.up: [-0.2, -0.1, 0.0]</code>. Each offset becomes <code>t + round(offset × 30)</code>. Read the blue cells in the zoom band, then check the chips under the strip.</p>`,
+    ask: { type: "mc", q: "With t = 100, which frame indices are fetched for observation.images.up?", o: ["94, 97, 100", "98, 99, 100", "80, 90, 100"], a: 0, why: "−0.2 s = −6 frames → 94; −0.1 s = −3 frames → 97; 0.0 → 100. Offsets are seconds, not frames: '98, 99, 100' would need [-0.0667, -0.0333, 0.0], and '80, 90, 100' would need [-0.667, -0.333, 0.0]." } },
+  { t: "Action chunk shape", setup: { t: 100, obs: [-0.1, 0], act: [0, 0.1, 0.2, 0.3] },
+    b: `<p>Action chunking asks for the current action and the next three, 0.1, 0.2 and 0.3 s ahead. On the joint plot the orange dots are exactly that: <b>the next 0.3 s of the plan</b>, one dot per motor per step.</p><p>LeRobot stacks the requested frames along a new leading dimension, so <code>sample["action"]</code> gets one row per offset and one column per motor.</p>`,
+    ask: { type: "num", q: "How many rows does sample[\"action\"] have?", a: 4, tol: 0.01, why: "Four offsets → shape [4, 6]: 4 time steps × 6 motors (shoulder_pan … gripper). The images get the same treatment, [2, 3, 480, 640]. A DataLoader with batch_size=16 then prepends a batch dimension: [16, 4, 6] and [16, 2, 3, 480, 640]. One quirk of lerobot 0.6.1: with a single offset, tabular keys keep the leading dimension (action → [1, 6]) but a lone video frame is squeezed to [3, 480, 640]." } },
+  { t: "Padding at the edge", setup: { t: 239, obs: [-0.1, 0], act: [0, 0.1, 0.2, 0.3] },
+    b: `<p>t is now the <b>last frame</b> of the episode. The chunk wants frames 242, 245 and 248, which belong to no frame of episode 17. LeRobot never reads into episode 18: it clamps every index to <code>[episode_start, episode_end − 1]</code>, returns a copy of the last frame, and flags it in <code>action_is_pad</code>. Look at the red hatched cells and the arrows pulling them back to frame 239.</p>`,
+    ask: { type: "num", q: "How many entries of action_is_pad are True?", a: 3, tol: 0.01, why: "Offsets 0.1, 0.2 and 0.3 s all land past the end, so action_is_pad = [False, True, True, True]. The three padded rows are copies of frame 239. Your loss has to mask them (ACT, for one, multiplies its L1 loss by ~action_is_pad), or the policy learns that the world freezes at the end of every episode. Drag t to frame 0 with a history window to see the same thing at the start." } },
+  { t: "Not a whole frame", setup: { t: 100, obs: [-0.1, 0, 0.05], act: [0, 0.1, 0.2, 0.3] },
+    b: `<p>Someone added <b>0.05 s</b> to the camera list. At 30 fps that is 1.5 frames, and there is no frame 101.5. LeRobot checks every offset against the frame grid when the dataset is built (<code>tolerance_s = 1e-4</code>) and raises before you fetch anything. The editor shows the same error in red; the fetch above ignores the bad offset until you remove it or change it to 0.0667.</p>`,
+    ask: { type: "mc", q: "What does LeRobotDataset do with 0.05 at 30 fps?", o: ["Rejects it: 1.5 frames isn't a multiple of 1/fps", "Rounds it to 2 frames", "Silently drops it"], a: 0, why: "check_delta_timestamps raises a ValueError listing the offending offsets. Only whole-frame offsets survive: …, −0.0667, −0.0333, 0, 0.0333, 0.0667, … (the check allows 1e-4 s of slack, so 0.0333 passes and 0.033 does not)." } },
+  { t: "Streaming is a stream", setup: { t: 100, obs: [0], act: [0] },
+    b: `<p><code>StreamingLeRobotDataset</code> reads straight from the Hub without downloading everything first, so it is a PyTorch <b>IterableDataset</b>: you pull samples in sequence (shuffled through a 1000-sample buffer by default) instead of asking for row 100. The course page shows <code>streaming_dataset[100]</code>; that line raises. The commented lines at the bottom of the code panel are the working form.</p>`,
+    ask: { type: "mc", q: "Why does streaming_dataset[100] fail?", o: ["An IterableDataset has no __getitem__; use next(iter(streaming_dataset))", "The dataset hasn't been downloaded yet", "Index 100 is out of range"], a: 0, why: "Indexing needs __getitem__, which IterableDataset deliberately doesn't define: a stream has no random access. next(iter(streaming_dataset)) gives you the first sample, with the same delta_timestamps windowing and is_pad masks as the regular class." } },
+];
+const MORE = [
+  "Add −0.5 to the camera list (15 frames back) and drag t below 15: watch is_pad flip one entry at a time, and the copies pile up on frame 0.",
+  "Add 1.0 to the action list and sweep t through the last second of the episode: the padded copy of frame 239 shows up as orange dots stuck on the last value of every curve.",
+  "Try 0.0333 and 0.033 as offsets. One is within tolerance_s = 1e-4 of a whole frame and one is not; find where the boundary sits.",
+];
+let LS = store.get("ds-ls", 0), DONE = store.get("ds-done", {});
+function applySetup(s) { if (!s) return; if (s.t != null) S.t = clamp(s.t, 0, EP_LEN - 1); if (s.obs) S.obs = s.obs.slice(); if (s.act) S.act = s.act.slice(); renderEditor(); render(); }
+function renderLesson(apply) {
+  const i = clamp(LS, 0, L.length - 1), st = L[i]; LS = i;
+  $("lsCount").textContent = `${i + 1} / ${L.length}`;
+  $("lsTitle").textContent = st.t; $("lsBody").innerHTML = st.b;
+  $("lsDots").innerHTML = L.map((_, k) => `<button aria-label="Step ${k + 1}" class="${k === i ? "cur" : DONE[k] ? "done" : ""}" data-k="${k}"></button>`).join("");
+  $("lsDots").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { LS = +b.dataset.k; store.set("ds-ls", LS); renderLesson(true); }));
+  $("lsPrev").disabled = i === 0; $("lsNext").textContent = i === L.length - 1 ? "Done ✓" : "Next →";
+  $("more").innerHTML = MORE.map((x) => `<li>${x}</li>`).join("");
+  const A = st.ask, box = $("lsAsk");
+  if (!A) box.innerHTML = "";
+  else if (A.type === "num") {
+    box.innerHTML = `<div class="ask"><div class="q">🤔 Predict: ${A.q}</div><div class="row" style="margin:0"><input type="number" step="any" id="ansIn" aria-label="Your answer"><button id="ansBtn">Check</button><button id="ansShow" class="ghost">Show answer</button></div><div class="fb" id="ansFb"></div></div>`;
+    const check = (reveal) => { const v = parseFloat($("ansIn").value), ok = !reveal && Math.abs(v - A.a) <= A.tol;
+      $("ansFb").className = "fb " + (ok ? "good" : reveal ? "" : "no");
+      $("ansFb").innerHTML = (ok ? "✓ Right." : reveal ? `Answer: <b>${A.a}</b>.` : isNaN(v) ? "Type a number first." : `Not quite. Try again, or show the answer.`) + (ok || reveal ? `<span class="why">${A.why}</span>` : "");
+      if (ok || reveal) { DONE[i] = 1; store.set("ds-done", DONE); renderDots(i); } };
+    $("ansBtn").onclick = () => check(false); $("ansShow").onclick = () => check(true);
+    $("ansIn").addEventListener("keydown", (e) => { if (e.key === "Enter") check(false); });
+  } else {
+    box.innerHTML = `<div class="ask"><div class="q">🤔 ${A.q}</div><div class="opts">${A.o.map((o, k) => `<button data-k="${k}">${esc(o)}</button>`).join("")}</div><div class="fb" id="ansFb"></div></div>`;
+    box.querySelectorAll(".opts button").forEach((b) => b.addEventListener("click", () => {
+      const k = +b.dataset.k, ok = k === A.a; b.classList.add(ok ? "right" : "wrong");
+      $("ansFb").className = "fb " + (ok ? "good" : "no");
+      $("ansFb").innerHTML = ok ? `✓ Right.<span class="why">${A.why}</span>` : "Not that one. Try another.";
+      if (ok) { DONE[i] = 1; store.set("ds-done", DONE); renderDots(i); } }));
+  }
+  if (apply) applySetup(st.setup);
+}
+function renderDots(i) { $("lsDots").querySelectorAll("button").forEach((b, k) => { b.className = k === i ? "cur" : DONE[k] ? "done" : ""; }); }
+$("lsPrev").onclick = () => { LS = Math.max(0, LS - 1); store.set("ds-ls", LS); renderLesson(true); };
+$("lsNext").onclick = () => {
+  if (!L[LS].ask) { DONE[LS] = 1; store.set("ds-done", DONE); }
+  if (LS < L.length - 1) { LS++; store.set("ds-ls", LS); renderLesson(true); return; }
+  toast("That's the whole lesson. Unit 2's arm playground is one tab up.");
+};
+$("lsSetup").onclick = () => applySetup(L[LS].setup);
+
+// ================= UI wiring =================
+$("tS").addEventListener("input", (e) => setT(+e.target.value));
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => { applySetup(PRESETS[b.dataset.preset]); toast(b.textContent + " recipe loaded"); }));
+$("theme").onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark"; store.set("theme", r.dataset.theme); cssCache = {}; hatchCache = {}; render(); };
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { cssCache = {}; hatchCache = {}; render(); });
+window.addEventListener("resize", render);
+$("copyCode").onclick = async () => { try { await navigator.clipboard.writeText(CODE); toast("Python copied"); } catch (e) { toast("Couldn't reach the clipboard: select the code and copy it"); } };
+// pointer: the timeline (strip = absolute, zoom band = click a cell, drag to scrub)
+let tlDrag = null;
+const tlPoint = (ev) => { const r = tl.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
+const frameAtX = (x) => clamp(Math.floor((x - TL.sx) / TL.ppf), 0, EP_LEN - 1);
+tl.addEventListener("pointerdown", (e) => {
+  const p = tlPoint(e); tl.setPointerCapture(e.pointerId);
+  if (p.y >= TL.zy - 14 && p.y <= TL.zy + TL.zh + 16) { const f = clamp(TL.first + Math.floor((p.x - TL.zx) / TL.cellW), 0, EP_LEN - 1); setT(f); tlDrag = { zoom: true, x0: p.x, t0: f }; }
+  else { setT(frameAtX(p.x)); tlDrag = { zoom: false }; }
+});
+tl.addEventListener("pointermove", (e) => { if (!tlDrag) return; const p = tlPoint(e); if (tlDrag.zoom) setT(tlDrag.t0 + Math.round((p.x - tlDrag.x0) / TL.cellW)); else setT(frameAtX(p.x)); });
+tl.addEventListener("pointerup", () => { tlDrag = null; }); tl.addEventListener("pointercancel", () => { tlDrag = null; });
+// deep links:  #t=100&obs=-0.2,-0.1,0&act=0,0.1,0.2,0.3&step=3
+function readHash() {
+  const out = {};
+  for (const p of (location.hash || "").replace(/^#/, "").split("&").filter(Boolean)) { const [k, v] = p.split("="); if (v == null) continue;
+    if (k === "t") out.t = parseInt(v, 10); else if (k === "obs" || k === "act") out[k] = decodeURIComponent(v).split(",").map(Number).filter((x) => !isNaN(x));
+    else if (k === "step") out.step = parseInt(v, 10) - 1; else if (k === "theme") out.theme = v; }
+  return out;
+}
+const hashNum = (d) => String(+d.toFixed(4));
+$("copy").onclick = async () => {
+  const url = location.href.split("#")[0] + `#t=${S.t}&obs=${S.obs.map(hashNum).join(",")}&act=${S.act.map(hashNum).join(",")}&step=${LS + 1}`;
+  try { await navigator.clipboard.writeText(url); toast("Link copied"); } catch (e) { history.replaceState(null, "", url); toast("Link is in the address bar"); }
+};
+
+// ================= boot =================
+(function boot() {
+  const th = store.get("theme", null); if (th) document.documentElement.dataset.theme = th;
+  const hsh = readHash();
+  if (hsh.theme === "light" || hsh.theme === "dark") document.documentElement.dataset.theme = hsh.theme;
+  if (hsh.step != null && !isNaN(hsh.step)) LS = clamp(hsh.step, 0, L.length - 1);
+  const deep = (hsh.t != null && !isNaN(hsh.t)) || hsh.obs || hsh.act;
+  if (deep) { if (hsh.t != null && !isNaN(hsh.t)) S.t = clamp(hsh.t, 0, EP_LEN - 1); if (hsh.obs) S.obs = hsh.obs; if (hsh.act) S.act = hsh.act; }
+  renderLesson(!deep);            // a fresh visit starts from the current step's setup; a deep link keeps its own window
+  if (deep) { renderEditor(); render(); }
+})();
+</script>
+</body>
+</html>

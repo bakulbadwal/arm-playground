@@ -1,0 +1,13 @@
+{
+  "name": "arm-playground",
+  "version": "1.0.0",
+  "description": "Interactive two-joint robot arm with guided lessons: a companion to Unit 2 of the Hugging Face Robotics Course.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test.mjs"
+  },
+  "license": "MIT",
+  "repository": "github:bakulbadwal/arm-playground",
+  "homepage": "https://bakulbadwal.github.io/arm-playground/"
+}

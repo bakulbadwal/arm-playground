@@ -62,12 +62,19 @@ button.ghost { background: transparent; }
 nav.tabs { display: flex; gap: 6px; margin: 18px 0 10px; flex-wrap: wrap; }
 nav.tabs button { border-radius: 999px; padding: 7px 14px 9px; position: relative; overflow: hidden; }
 nav.tabs .prog { position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 25%, transparent); }
-nav.tabs .prog i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--ok); transition: width .3s; }
+nav.tabs .prog i { display: block; height: 100%; width: 100%; border-radius: 2px; background: var(--ok); transform: scaleX(0); transform-origin: left; transition: transform .3s; }
 nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .eq { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .eqc { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; box-shadow: var(--shadow); min-width: 0; }
 .eqc .tex { font-size: 16px; overflow-x: auto; overflow-y: hidden; }
 .eqc .gloss { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.syms { margin: -6px 0 14px; font-size: 14px; }
+.syms summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+.syms ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 16px; }
+.syms li { display: flex; gap: 10px; align-items: baseline; color: var(--muted); }
+.syms button.sym { font: 600 13px ui-monospace, "SF Mono", Menlo, monospace; padding: 2px 8px; border-radius: 7px; min-width: 60px; text-align: center; color: var(--ink); flex: none; }
+.syms button.sym:hover { background: var(--chip); }
+.hl { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 8px; transition: box-shadow .2s; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start;
   grid-template-areas: "task cs" "lesson controls" "math controls"; }
 .area-task { grid-area: task; } .area-cs { grid-area: cs; } .area-lesson { grid-area: lesson; } .area-math { grid-area: math; } .area-controls { grid-area: controls; }
@@ -137,7 +144,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
 <div class="wrap">
   <div class="top">
     <div class="brand">
-      <div class="kicker">Companion to the <a href="https://huggingface.co/learn/robotics-course" target="_blank" rel="noopener">Hugging Face Robotics Course</a> · Unit 2</div>
+      <div class="kicker">Companion to the <a href="https://huggingface.co/learn/robotics-course" target="_blank" rel="noopener">Hugging Face Robotics Course</a> · Unit 2 &nbsp;·&nbsp; <a href="datasets.html" title="The Unit 1 page: what LeRobotDataset fetches for a temporal window">Unit 1 · Datasets →</a></div>
       <h1><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 50 L30 34" stroke="var(--link1)" stroke-width="7" stroke-linecap="round"/><path d="M30 34 L50 16" stroke="var(--link2)" stroke-width="7" stroke-linecap="round"/><circle cx="14" cy="50" r="5" fill="var(--bg)"/><circle cx="30" cy="34" r="5" fill="var(--bg)"/></svg>Arm Playground</h1>
       <p>Robot kinematics and control on the course's two-joint arm. <b>Task space</b> shows where the hand is. <b>Configuration space</b> maps every pair of joint angles (θ₁, θ₂) as one pixel. Follow the lesson on each tab, or just play.</p>
     </div>
@@ -155,6 +162,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
   </nav>
 
   <div class="eq" id="eq"></div>
+  <details class="syms" id="syms"><summary>What do the symbols mean? Tap one to see it on screen.</summary><ul id="symList"></ul></details>
 
   <div class="grid">
     <section class="card area-task">
@@ -194,7 +202,7 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
         <h2>The math, live</h2>
         <div class="math" id="math"></div>
         <div data-panel="fb">
-          <div class="sub" style="margin-top:10px"><b>Discrete-time error</b>: e<sub>k+1</sub> = e<sub>k</sub> − k<sub>p</sub>Δt · e<sub>k−d</sub> (d = latency in ticks), starting from a unit step</div>
+          <div class="sub" style="margin-top:10px" id="barsCap"></div>
           <canvas id="bars" aria-label="Discrete error sequence"></canvas>
         </div>
       </section>
@@ -260,11 +268,12 @@ footer { margin-top: 26px; color: var(--muted); font-size: 13px; display: flex; 
           <button id="resetF">Reset</button>
         </div>
         <div class="ctl"><label for="kp">Gain k_p (1/s)</label><input type="range" id="kp" min="0" max="120" step="0.5" value="4"><output id="kpo"></output></div>
+        <div class="ctl hidden" id="kdRow"><label for="kd">Damping k_d</label><input type="range" id="kd" min="0" max="16" step="0.25" value="0"><output id="kdo"></output></div>
         <div class="ctl"><label for="rate">Control rate (Hz)</label><input type="range" id="rate" min="5" max="200" step="1" value="50"><output id="rateo"></output></div>
         <div class="ctl"><label for="lat">Latency (ms)</label><input type="range" id="lat" min="0" max="200" step="5" value="0"><output id="lato"></output></div>
         <div class="ctl"><label for="merr">Model error</label><input type="range" id="merr" min="-40" max="40" step="5" value="0"><output id="merro"></output></div>
         <div class="ctl"><label for="qmax">Joint speed limit</label><input type="range" id="qmax" min="1" max="20" step="0.5" value="8"><output id="qmaxo"></output></div>
-        <div class="checks"><label><input type="checkbox" id="ff" checked> Feed-forward ṗ* (the plan's velocity)</label></div>
+        <div class="checks"><label><input type="checkbox" id="ff" checked> Feed-forward ṗ* (the plan's velocity)</label><label><input type="checkbox" id="inertia"> Inertia (the arm has mass)</label></div>
         <canvas id="plot" aria-label="Tracking error over time"></canvas>
         <div class="sub">Tracking error |Δp| over the last 10 s. Grey dashed curve = the ideal continuous response D·e<sup>−k<sub>p</sub>t</sup> after each step; the gap between it and the red line is what discrete updates, latency and the speed limit cost you.</div>
       </div>
@@ -299,7 +308,8 @@ const S = {
   q: [rad(30), rad(60)], target: [0.866, 1.5],
   pdes: [0.1, 0], inv: "damped", lam: 0.1, runJ: false, keys: {},
   anim: null, wiggle: null, iter: null, hoverQ: null, fkTrail: [],
-  fb: { kp: 4, rate: 50, lat: 0, merr: 0, qmax: 8, ff: true, path: "step", running: true,
+  hl: null,
+  fb: { kp: 4, kd: 0, rate: 50, lat: 0, merr: 0, qmax: 8, ff: true, inertia: false, path: "step", running: true, prevPm: null, qdd: [0, 0],
         t: 0, q: null, qdot: [0, 0], nextCtl: 0, hist: [], qbuf: [], trail: [], qtrail: [], drag: [0.5, 1.2], lastHist: 0,
         stepInfo: null, lastStep: null, switches: [] },
 };
@@ -564,6 +574,8 @@ function drawTask() {
     arrow(ctx, t.x(e[0]), t.y(e[1]), t.x(h[0]), t.y(h[1]), css("--link2"), 1.6, 8);
     drawAngles(ctx, t, q);
     label(ctx, t.x(h[0]) + 12, t.y(h[1]) - 12, `p = (${f2(h[0])}, ${f2(h[1])})`, null, true);
+    if (hlIs("p")) pulse(ctx, t.x(h[0]), t.y(h[1]), css("--accent"));
+    if (hlIs("q")) { pulse(ctx, t.x(0), t.y(0), css("--link1")); pulse(ctx, t.x(e[0]), t.y(e[1]), css("--link2")); }
     legend.push(sw("--link1", "link 1 at θ₁"), sw("--link2", "link 2 at θ₁+θ₂ · fading trail = where the hand has been"), "grey dashes: θ₂ is measured from link 1's direction");
   } else if (S.tab === "ik") {
     const res = ik(S.target), valid = res.sols.map((s) => status(s) === 0);
@@ -574,6 +586,8 @@ function drawTask() {
       S.iter.hand.forEach((p, i) => (i ? ctx.lineTo(t.x(p[0]), t.y(p[1])) : ctx.moveTo(t.x(p[0]), t.y(p[1])))); ctx.stroke(); ctx.restore(); }
     drawArm(ctx, t, q, badArm);
     crosshair(ctx, t.x(S.target[0]), t.y(S.target[1]), css("--target"));
+    if (hlIs("target")) pulse(ctx, t.x(S.target[0]), t.y(S.target[1]), css("--target"));
+    if (hlIs("q")) { const eq = fk(q).e; pulse(ctx, t.x(0), t.y(0), css("--link1")); pulse(ctx, t.x(eq[0]), t.y(eq[1]), css("--link2")); }
     legend.push(sw("--target", "target p* (drag it)"), sw("--ghost", "other solution"), sw("--bad", "blocked solution"), "green dots: closest feasible pose");
   } else if (S.tab === "jac") {
     drawArm(ctx, t, q, badArm);
@@ -581,12 +595,15 @@ function drawTask() {
     ctx.save(); ctx.strokeStyle = css("--muted"); ctx.fillStyle = css("--accent"); ctx.globalAlpha = 0.9; ctx.lineWidth = 1.3; ctx.beginPath();
     for (let i = 0; i <= 72; i++) { const a = i / 72 * 2 * Math.PI, v = mv(J, [Math.cos(a), Math.sin(a)]); const X = hx + v[0] * k, Y = hy - v[1] * k; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
     ctx.closePath(); ctx.globalAlpha = 0.08; ctx.fill(); ctx.globalAlpha = 0.9; ctx.stroke(); ctx.restore();
-    const hi = S.wiggle ? S.wiggle.j : -1;
-    arrow(ctx, hx, hy, hx + J[0][0] * k, hy - J[1][0] * k, css("--link1"), hi === 0 ? 4 : 2.6);
-    arrow(ctx, hx, hy, hx + J[0][1] * k, hy - J[1][1] * k, css("--link2"), hi === 1 ? 4 : 2.6);
+    const hi = S.wiggle ? S.wiggle.j : -1, hj = hlIs("J");
+    arrow(ctx, hx, hy, hx + J[0][0] * k, hy - J[1][0] * k, css("--link1"), hi === 0 || hj ? 4.5 : 2.6);
+    arrow(ctx, hx, hy, hx + J[0][1] * k, hy - J[1][1] * k, css("--link2"), hi === 1 || hj ? 4.5 : 2.6);
+    if (hj) pulse(ctx, hx, hy, css("--accent"));
+    if (hlIs("q")) { const eq = fk(q).e; pulse(ctx, t.x(0), t.y(0), css("--link1")); pulse(ctx, t.x(eq[0]), t.y(eq[1]), css("--link2")); }
     label(ctx, hx + J[0][0] * k + 6, hy - J[1][0] * k - 4, "col 1", css("--link1"), true);
     label(ctx, hx + J[0][1] * k + 6, hy - J[1][1] * k + 14, "col 2", css("--link2"), true);
-    const vs = 1.2 * t.s; arrow(ctx, hx, hy, hx + S.pdes[0] * vs, hy - S.pdes[1] * vs, css("--target"), 3.2, 11);
+    const vs = 1.2 * t.s, hp = hlIs("pdes"); arrow(ctx, hx, hy, hx + S.pdes[0] * vs, hy - S.pdes[1] * vs, css("--target"), hp ? 5 : 3.2, 11);
+    if (hp) pulse(ctx, hx + S.pdes[0] * vs, hy - S.pdes[1] * vs, css("--target"));
     label(ctx, hx + S.pdes[0] * vs + 8, hy - S.pdes[1] * vs + 4, "ṗ*", css("--target"), true);
     legend.push(sw("--link1", "column 1: shoulder nudge"), sw("--link2", "column 2: elbow nudge"), "ellipse: hand velocities from unit joint speed", sw("--target", "desired ṗ*"));
   } else if (S.tab === "fb") {
@@ -596,8 +613,9 @@ function drawTask() {
     const tp = targetAt(F.t).p, { h } = fk(q), b = 10;
     ctx.save(); ctx.fillStyle = css("--target"); ctx.globalAlpha = 0.22; ctx.fillRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b); ctx.globalAlpha = 1;
     ctx.strokeStyle = css("--target"); ctx.lineWidth = 2; ctx.strokeRect(t.x(tp[0]) - b, t.y(tp[1]) - b, 2 * b, 2 * b);
-    ctx.strokeStyle = css("--bad"); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(tp[0]), t.y(tp[1])); ctx.stroke(); ctx.restore();
+    const hd = hlIs("dp"); ctx.strokeStyle = css("--bad"); ctx.setLineDash([3, 3]); ctx.lineWidth = hd ? 4 : 1.5; ctx.beginPath(); ctx.moveTo(t.x(h[0]), t.y(h[1])); ctx.lineTo(t.x(tp[0]), t.y(tp[1])); ctx.stroke(); ctx.restore();
     drawArm(ctx, t, q, badArm);
+    if (hd) pulse(ctx, (t.x(h[0]) + t.x(tp[0])) / 2, (t.y(h[1]) + t.y(tp[1])) / 2, css("--bad"));
     legend.push(sw("--target", "moving target"), sw("--bad", "Δp, or arm in collision"), sw("--link2", "hand trail"));
   }
   $("taskLegend").innerHTML = legend.map((x) => `<span>${x}</span>`).join("");
@@ -635,6 +653,9 @@ function drawCS() {
   const q = shownQ();
   ctx.fillStyle = css("--ink"); ctx.strokeStyle = css("--panel"); ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 6.5, 0, 7); ctx.fill(); ctx.stroke();
+  if (hlIs("q")) pulse(ctx, X(q[0]), Y(q[1]), css("--accent"));
+  if (hlIs("Q")) { const tt = (performance.now() - S.hl.t0) / 1000; ctx.save(); ctx.strokeStyle = css("--accent"); ctx.lineWidth = 4; ctx.globalAlpha = 0.9 * (1 - tt / 1.7); ctx.strokeRect(2, 2, w - 4, w - 4); ctx.restore();
+    ik(S.target).sols.forEach((s2) => pulse(ctx, X(s2[0]), Y(s2[1]), css("--target"))); }
 }
 function polyQ(ctx, pts, X, Y, w, color, lw, alpha = 1) {
   ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.globalAlpha = alpha; ctx.beginPath(); let prev = null;
@@ -656,6 +677,53 @@ function renderEq() {
     if (window.katex) { try { katex.render(tex, el, { throwOnError: false, displayMode: false }); return; } catch (e) {} }
     el.textContent = tex.replace(/\\[a-z]+/gi, (m) => ({ "\\theta": "θ", "\\cos": "cos", "\\sin": "sin", "\\dot": "", "\\det": "det", "\\min": "min", "\\Delta": "Δ" }[m] ?? "")).replace(/[{}]/g, ""); });
 }
+
+// ================= symbols key =================
+// [symbol, plain English, highlight key]. Highlight keys: DOM ids or canvas objects handled in pulse().
+const SYMS = {
+  fk: [["q = (θ₁, θ₂)", "the two joint angles. Shoulder and elbow: the θ sliders, and the black dot on the map", "q"],
+       ["l₁, l₂", "how long each link is (the length sliders)", "l"],
+       ["p(q)", "where the hand ends up: its (x, y) coordinates on the left", "p"],
+       ["cos θ, sin θ", "how far a link of length 1 reaches to the right (cos) and up (sin) when it points at angle θ", null],
+       ["θ₁ + θ₂", "link 2's absolute direction, because θ₂ is measured from link 1, not from the ground", "q"]],
+  ik: [["p*", "the target: where you want the hand. The green crosshair you drag", "target"],
+       ["q", "the pose the arm is in right now (black dot on the map)", "q"],
+       ["𝒬", "the set of allowed poses: the white part of the map. Floor, shelf and joint limits paint some of it out", "Q"],
+       ["‖p(q) − p*‖²", "the squared distance from hand to target. Zero means you're there", "target"],
+       ["min over q", "search every allowed pose for the smallest miss. That search is inverse kinematics", "Q"],
+       ["r", "the target's distance from the base; inside the ring means reachable", "target"],
+       ["A, B", "the two exact answers (elbow one way or the other), drawn as rings on the map", "Q"]],
+  jac: [["ṗ", "the hand's velocity. A dot over a symbol means 'per second'", "pdes"],
+        ["q̇", "the joint speeds, in radians per second", "q"],
+        ["J(q)", "the Jacobian: a 2×2 table whose two columns are the two arrows at the hand, one per joint", "J"],
+        ["ṗ*", "the hand velocity you're asking for: the green arrow", "pdes"],
+        ["J⁺", "the best-effort inverse of J. Same as J⁻¹ unless J is singular; then 'damped' keeps it finite", "lam"],
+        ["det J", "how fat the velocity ellipse is; zero means some direction is impossible", "J"],
+        ["λ", "damping: how much to sacrifice accuracy for sane joint speeds near a singularity", "lam"]],
+  fb: [["Δp = p* − p(q)", "the error: from hand to target, the red dashed line", "dp"],
+       ["k_p", "the gain: how hard to push per unit of error (the slider)", "kp"],
+       ["k_d", "damping: a brake proportional to speed. Only matters once the arm has mass (Inertia on); the course's velocity-commanded arm has none", "kd"],
+       ["ṗ*", "the plan's own velocity, added when 'Feed-forward' is on", "ff"],
+       ["Δt", "how long between controller updates: 1 / control rate", "rate"],
+       ["d", "latency measured in controller ticks", "lat"],
+       ["e_k", "the error at tick k, in the bar chart under the math panel", "bars"]],
+};
+const HL_DOM = { q: ["t1", "t2"], l: ["l1", "l2"], lam: ["lam"], kp: ["kp"], kd: ["kd"], ff: ["ff"], rate: ["rate"], lat: ["lat"], bars: ["bars"] };
+function renderSyms() {
+  $("symList").innerHTML = SYMS[S.tab].map(([sym, txt, key]) => `<li><button class="sym" ${key ? `data-hl="${key}"` : "disabled"}>${sym}</button><span>${txt}</span></li>`).join("");
+  $("symList").querySelectorAll("button[data-hl]").forEach((b) => b.addEventListener("click", () => highlight(b.dataset.hl)));
+}
+function highlight(key) {
+  S.hl = { key, t0: performance.now() };
+  for (const id of HL_DOM[key] || []) { const el = $(id), box = el.closest(".ctl") || el.closest("label") || el; box.classList.add("hl"); setTimeout(() => box.classList.remove("hl"), 1700); }
+}
+// pulsing ring at a canvas point while a symbol is highlighted
+function pulse(ctx, x, y, color) {
+  if (!S.hl) return; const t = (performance.now() - S.hl.t0) / 1000; if (t > 1.7) { S.hl = null; return; }
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.globalAlpha = 0.9 * (1 - t / 1.7);
+  ctx.beginPath(); ctx.arc(x, y, 16 + 10 * Math.sin(t * 9), 0, 7); ctx.stroke(); ctx.restore();
+}
+const hlIs = (k) => S.hl && S.hl.key === k && performance.now() - S.hl.t0 < 1700;
 
 // ================= math panel =================
 function renderMath() {
@@ -687,18 +755,30 @@ function renderMath() {
   } else if (S.tab === "fb") {
     const F = S.fb, dt = 1 / F.rate, kd = F.kp * dt, tp = targetAt(F.t).p, err = Math.hypot(tp[0] - h[0], tp[1] - h[1]), d = Math.round(F.lat / 1000 / dt);
     const regime = kd < 1 ? ["ok", "smooth"] : kd < 2 ? ["warn", "overshoots, settles"] : ["bad", "unstable"];
-    const e = errSeq(kd, d), unstable = Math.abs(e[e.length - 1]) > 1.05, ringing = e.some((x) => x < -0.01);
+    const e = errSeq(kd, d, 40), unstable = Math.abs(e[e.length - 1]) > 1.05, ringing = e.some((x) => x < -0.01);
     const actual = unstable ? ["bad", "unstable"] : ringing ? ["warn", "rings"] : ["ok", "smooth"];
-    m = `q̇ = J(q)⁺ ( ${F.ff ? "ṗ*" : "0 "} + k_p Δp ),   Δp = p* − p(q)\n\nk_p = ${F.kp.toFixed(1)} /s   Δt = 1/${F.rate} Hz = ${(dt * 1000).toFixed(1)} ms   latency ${F.lat} ms = ${d} tick${d === 1 ? "" : "s"}\n` +
-        `k_p·Δt = ${kd.toFixed(2)}  <span class="pill ${regime[0]}">rule of thumb: ${regime[1]}</span>  <span class="pill ${actual[0]}">${d ? "with " + d + "-tick delay" : "exact sequence"}: ${actual[1]}</span>\n` +
+    const kc = 2 * Math.sqrt(F.kp), zeta = F.kp > 0 ? F.kd / kc : 0, damp = zeta < 0.05 ? ["bad", "undamped: oscillates forever"] : zeta < 0.8 ? ["warn", "underdamped: rings, then settles"] : zeta <= 1.25 ? ["ok", "≈ critically damped"] : ["warn", "overdamped: slow"];
+    m = F.inertia
+      ? `q̈ = J(q)⁺ ( k_p Δp + k_d (${F.ff ? "ṗ*" : "0"} − ṗ) − J̇q̇ ),   Δp = p* − p(q)      ← a command is now an acceleration\n\nk_p = ${F.kp.toFixed(1)}  (spring)   k_d = ${F.kd.toFixed(2)}  (damper)   inner loop 500 Hz (control-rate slider idle)   latency ${F.lat} ms\n` +
+        `critical damping k_d = 2√k_p = ${kc.toFixed(1)}   ζ = k_d / 2√k_p = ${zeta.toFixed(2)}  <span class="pill ${damp[0]}">${damp[1]}</span>\n`
+      : `q̇ = J(q)⁺ ( ${F.ff ? "ṗ*" : "0 "} + k_p Δp ),   Δp = p* − p(q)\n\nk_p = ${F.kp.toFixed(1)} /s   Δt = 1/${F.rate} Hz = ${(dt * 1000).toFixed(1)} ms   latency ${F.lat} ms = ${d} tick${d === 1 ? "" : "s"}\n` +
+        `k_p·Δt = ${kd.toFixed(2)}  <span class="pill ${regime[0]}">rule of thumb: ${regime[1]}</span>  <span class="pill ${actual[0]}">${d ? "with " + d + "-tick delay" : "exact sequence"}: ${actual[1]}</span>\n`;
+    m +=
         `model error ${F.merr > 0 ? "+" : ""}${F.merr}% (controller's J uses wrong link lengths)\n\n|Δp| now = ${f3(err)}` +
         (F.path === "step" && F.lastStep ? `\nlast step: overshoot ${F.lastStep.os.toFixed(0)}%  ·  settles (2%) in ${F.lastStep.settle == null ? "> 3 s" : F.lastStep.settle.toFixed(2) + " s"}` : "") + `\n${pose}  ${st ? '<span class="pill bad">' + STATUS_TXT[st] + "</span>" : ""}`;
   }
   $("math").innerHTML = m;
 }
-function errSeq(kd, d, n = 40) { const e = new Array(d + 1).fill(1); for (let k = 0; k < n; k++) e.push(e[e.length - 1] - kd * e[e.length - 1 - d]); return e.slice(d); }
+function errSeq(kpdt, d, n = 40) { const e = new Array(d + 1).fill(1); for (let k = 0; k < n; k++) e.push(e[e.length - 1] - kpdt * e[e.length - 1 - d]); return e.slice(d); }
+function errSeq2(kp, kd, dt, n = 80) { // unit-mass spring–damper from a unit step, semi-implicit Euler at the control rate
+  const out = []; let e = 1, v = 0; for (let k = 0; k < n; k++) { out.push(e); v += (-kp * e - kd * v) * dt; e += v * dt; } return out;
+}
 function drawBars() {
-  const { ctx, w, h } = fit(bars), F = S.fb, dt = 1 / F.rate, d = Math.round(F.lat / 1000 / dt), e = errSeq(F.kp * dt, d, 36);
+  const { ctx, w, h } = fit(bars), F = S.fb, dt = 1 / F.rate, d = Math.round(F.lat / 1000 / dt);
+  const e = F.inertia ? errSeq2(F.kp, F.kd, dt, 90) : errSeq(F.kp * dt, d, 36);
+  $("barsCap").innerHTML = F.inertia
+    ? "<b>Second-order error</b> from a unit step: ë = −k<sub>p</sub>e − k<sub>d</sub>ė (one bar per 20 ms). With k<sub>d</sub> = 0 the bars never shrink."
+    : "<b>Discrete-time error</b>: e<sub>k+1</sub> = e<sub>k</sub> − k<sub>p</sub>Δt · e<sub>k−d</sub> (d = latency in ticks), starting from a unit step";
   ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--chip"); ctx.fillRect(0, 0, w, h);
   const mid = h / 2, bw = w / e.length, sc = (h / 2 - 4) / 1.6;
   ctx.strokeStyle = css("--line"); ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
@@ -716,7 +796,7 @@ function targetAt(t) {
   return { p: S.fb.drag.slice(), v: [0, 0] };
 }
 function resetFB() {
-  const F = S.fb; Object.assign(F, { t: 0, q: S.q.slice(), qdot: [0, 0], nextCtl: 0, hist: [], trail: [], qtrail: [], qbuf: [], lastHist: 0, stepInfo: null, lastStep: null, switches: [] });
+  const F = S.fb; Object.assign(F, { t: 0, q: S.q.slice(), qdot: [0, 0], nextCtl: 0, hist: [], trail: [], qtrail: [], qbuf: [], lastHist: 0, stepInfo: null, lastStep: null, switches: [], prevPm: null, qdd: [0, 0] });
   if (F.path === "step") beginStep(F, 0);
 }
 function beginStep(F, t) {
@@ -730,11 +810,25 @@ function stepFB(realDt) {
   const lagSteps = Math.round(F.lat / 1000 / SIM_DT), scale = 1 + F.merr / 100;
   while (steps-- > 0) {
     F.qbuf.push(F.q.slice()); while (F.qbuf.length > lagSteps + 1) F.qbuf.shift();
-    if (F.t >= F.nextCtl) {
+    if (F.inertia) {
+      // The arm has mass: a command is an acceleration, and PD = spring (k_p) + damper (k_d). This loop is the servo's
+      // inner loop, so it runs every sim step (500 Hz) on the latest (possibly delayed) measurement; the control-rate slider is idle here.
+      const qm = F.qbuf[0], pm = fk(qm).h, tgt = targetAt(F.t), lm = [S.l1 * scale, S.l2 * scale];
+      const pdot = F.prevPm ? [(pm[0] - F.prevPm[0]) / SIM_DT, (pm[1] - F.prevPm[1]) / SIM_DT] : [0, 0]; F.prevPm = pm;
+      const vs = F.ff ? tgt.v : [0, 0];
+      const a = [F.kp * (tgt.p[0] - pm[0]) + F.kd * (vs[0] - pdot[0]), F.kp * (tgt.p[1] - pm[1]) + F.kd * (vs[1] - pdot[1])];
+      // p̈ = J q̈ + J̇ q̇, so to make the hand accelerate by exactly `a` the controller subtracts its estimate of J̇ q̇
+      const Jq = jac(qm, lm[0], lm[1]), Jn = jac([qm[0] + F.qdot[0] * SIM_DT, qm[1] + F.qdot[1] * SIM_DT], lm[0], lm[1]);
+      const jdq = [((Jn[0][0] - Jq[0][0]) * F.qdot[0] + (Jn[0][1] - Jq[0][1]) * F.qdot[1]) / SIM_DT, ((Jn[1][0] - Jq[1][0]) * F.qdot[0] + (Jn[1][1] - Jq[1][1]) * F.qdot[1]) / SIM_DT];
+      const P = dampedPinv(Jq, 0.02);
+      F.qdd = (P ? mv(P, [a[0] - jdq[0], a[1] - jdq[1]]) : [0, 0]).map((x) => clamp(x, -400, 400));
+      F.qdot = [clamp(F.qdot[0] + F.qdd[0] * SIM_DT, -F.qmax, F.qmax), clamp(F.qdot[1] + F.qdd[1] * SIM_DT, -F.qmax, F.qmax)];
+    } else if (F.t >= F.nextCtl) { // the course's controller: a command is a velocity, updated at the control rate
       const qm = F.qbuf[0], pm = fk(qm).h, tgt = targetAt(F.t);
-      const v = [(F.ff ? tgt.v[0] : 0) + F.kp * (tgt.p[0] - pm[0]), (F.ff ? tgt.v[1] : 0) + F.kp * (tgt.p[1] - pm[1])];
       const P = dampedPinv(jac(qm, S.l1 * scale, S.l2 * scale), 0.02);
-      F.qdot = (P ? mv(P, v) : [0, 0]).map((x) => clamp(x, -F.qmax, F.qmax)); F.nextCtl += 1 / F.rate;
+      const v = [(F.ff ? tgt.v[0] : 0) + F.kp * (tgt.p[0] - pm[0]), (F.ff ? tgt.v[1] : 0) + F.kp * (tgt.p[1] - pm[1])];
+      F.qdot = (P ? mv(P, v) : [0, 0]).map((x) => clamp(x, -F.qmax, F.qmax));
+      F.nextCtl += 1 / F.rate;
     }
     F.q = [wrap(F.q[0] + F.qdot[0] * SIM_DT), wrap(F.q[1] + F.qdot[1] * SIM_DT)];
     const prevIdx = Math.floor(F.t / 3); F.t += SIM_DT;
@@ -762,7 +856,7 @@ function drawPlot() {
   ctx.strokeStyle = css("--line"); ctx.setLineDash([3, 3]);
   for (const s of S.fb.switches) if (s.t > t0) { ctx.beginPath(); ctx.moveTo(Xt(s.t), 0); ctx.lineTo(Xt(s.t), h); ctx.stroke(); }
   // ideal continuous response from each switch: e(t) = D·exp(−k_p (t − t_switch)), the "time constant 1/k_p" curve
-  if (S.fb.path === "step" && S.fb.kp > 0) { ctx.strokeStyle = css("--muted"); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+  if (S.fb.path === "step" && S.fb.kp > 0 && !S.fb.inertia) { ctx.strokeStyle = css("--muted"); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
     for (const s of S.fb.switches) { const tEnd = Math.min(t1, s.t + 3); if (tEnd <= t0) continue; ctx.beginPath();
       for (let t = Math.max(s.t, t0); t <= tEnd; t += 0.04) { const e = s.D * Math.exp(-S.fb.kp * (t - s.t)); t === Math.max(s.t, t0) ? ctx.moveTo(Xt(t), Y(e)) : ctx.lineTo(Xt(t), Y(e)); } ctx.stroke(); } }
   ctx.setLineDash([]); ctx.strokeStyle = css("--bad"); ctx.lineWidth = 1.6; ctx.beginPath();
@@ -841,12 +935,15 @@ const L = {
     { t: "Slow loops can't take high gain", setup: { path: "step", kp: 25, rate: 10, lat: 0, merr: 0 },
       b: "<p>Same arm, now updated at <b>10 Hz</b>. k_p = 25 would be nothing special at 50 Hz.</p>",
       ask: { type: "num", q: "What is k_p·Δt here?", a: 2.5, tol: 0.01, why: "25 × 0.1 = 2.5 > 2, so it's unstable. Only the joint speed limit keeps the arm on screen. That's why fast inner loops sit under slow policies (field guide §3.5)." } },
-    { t: "Latency", setup: { path: "step", kp: 30, rate: 50, lat: 60, merr: 0 },
+    { t: "Latency", setup: { path: "step", kp: 30, rate: 50, lat: 60, merr: 0, kd: 0 },
       b: "<p>Back to 50 Hz and k_p = 30 (k_pΔt = 0.6, 'smooth' by the rule). Now add <b>60 ms of latency</b>: the controller acts on a measurement three ticks old. Compare the two pills in the math panel. This is the slow shower pipe.</p>",
       ask: { type: "mc", q: "What's the best first fix?", o: ["Lower k_p, or cut the latency", "Raise k_p to correct faster", "Raise the joint speed limit"], a: 0, why: "Delay plus high gain means acting hard on stale news. Lower the gain or shorten the loop. More gain makes it worse." } },
     { t: "Tracking isn't planning", setup: { path: "sweep", kp: 5, rate: 50, lat: 0, merr: 0, floor: 1, shelf: 0 },
       b: "<p>Floor on. The controller tracks the box just fine, straight through the floor (the arm turns red). Nothing in q̇ = J⁺(ṗ* + k_pΔp) knows about obstacles; that's a separate planner's job.</p>",
       ask: { type: "mc", q: "Which of the course's four limitations of classical pipelines is this?", o: ["Integration: separate modules that each only do their own job", "Modelling limitations", "Ignoring data trends"], a: 0, why: "Planning, control and perception are separate modules with fixed interfaces. Each one is blind to what the others handle, and errors compound between them." } },
+    { t: "Give the arm mass (beyond the course)", setup: { path: "step", kp: 30, rate: 50, lat: 0, merr: 0, inertia: 1, kd: 0, qmax: 20 },
+      b: "<p>Unit 2's arm has no inertia: a command <i>is</i> a velocity, so proportional control can only overshoot through discretisation or latency. Real arms have mass, so a command is a <b>push</b> (an acceleration). <b>Inertia</b> is now on.</p><p>Watch the hand: with k_p alone it sails past the target and swings back, again and again, and once the target jumps it even <i>orbits</i> the target like a planet. Proportional control on a mass is a spring with no friction: nothing removes energy. Now slide <b>k_d</b> up: that's the damper, the D in PD, and the loop that runs inside every servo under a learned walking policy. Fastest settling with no overshoot is at <b>k_d = 2√k_p ≈ 11</b>.</p>",
+      ask: { type: "mc", q: "With inertia on and k_d = 0, what does the hand do after the step?", o: ["Oscillates around the target and never settles", "Settles smoothly, just slower", "Stops short of the target"], a: 0, why: "A spring pulls harder the further you are, but nothing removes energy, so the hand keeps swinging through the target. k_d removes energy in proportion to speed. The arm is now set to k_d = 11, critical damping: compare the error trace.", after: { kd: 11 } } },
   ],
 };
 const MORE = {
@@ -860,7 +957,7 @@ const BASE = {
   fk: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0 },
   ik: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, basins: 0 },
   jac: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, inv: "plain", lam: 0.1 },
-  fb: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, q: [30, 60], qmax: 8, ff: 1, merr: 0, lat: 0, rate: 50 },
+  fb: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, q: [30, 60], qmax: 8, ff: 1, merr: 0, lat: 0, rate: 50, kd: 0, inertia: 0 },
 };
 const stepSetup = (tab, i) => ({ ...BASE[tab], ...L[tab][i].setup });
 let LS = store.get("ls", { fk: 0, ik: 0, jac: 0, fb: 0 }), DONE = store.get("done", {});
@@ -877,8 +974,9 @@ function applySetup(s, animate = true) {
   if (s.lam != null) { S.lam = s.lam; $("lam").value = s.lam; }
   S.runJ = false; syncRunJ(); S.iter = null;
   const F = S.fb; let fbChanged = false;
-  for (const k of ["kp", "rate", "lat", "merr", "qmax"]) if (s[k] != null) { F[k] = s[k]; $(k).value = s[k]; fbChanged = true; }
+  for (const k of ["kp", "kd", "rate", "lat", "merr", "qmax"]) if (s[k] != null) { F[k] = s[k]; $(k).value = s[k]; fbChanged = true; }
   if (s.ff != null) { F.ff = !!s.ff; $("ff").checked = F.ff; }
+  if (s.inertia != null) { F.inertia = !!s.inertia; $("inertia").checked = F.inertia; syncInertiaUI(); fbChanged = true; }
   if (s.path) { F.path = s.path; $("path").value = s.path; fbChanged = true; }
   if (s.q) { const to = [rad(s.q[0]), rad(s.q[1])]; if (animate && S.tab !== "fb") S.anim = { from: S.q.slice(), to, t0: performance.now(), dur: 650 }; else S.q = to; }
   if (s.pdesOutward) { const q = s.q ? [rad(s.q[0]), rad(s.q[1])] : S.q, h = fk(q).h, n = Math.hypot(h[0], h[1]); S.pdes = [h[0] / n * s.pdesOutward, h[1] / n * s.pdesOutward]; }
@@ -959,20 +1057,20 @@ function frame(now) {
 function syncSliders() { $("t1").value = Math.round(deg(S.q[0])); $("t2").value = Math.round(deg(S.q[1])); $("t1o").textContent = fd(S.q[0]); $("t2o").textContent = fd(S.q[1]); }
 function outputs() {
   $("l1o").textContent = S.l1.toFixed(2); $("l2o").textContent = S.l2.toFixed(2); $("limo").textContent = S.lim + "°"; $("lamo").textContent = S.lam.toFixed(2);
-  const F = S.fb; $("kpo").textContent = F.kp.toFixed(1); $("rateo").textContent = F.rate; $("lato").textContent = F.lat;
+  const F = S.fb; $("kpo").textContent = F.kp.toFixed(1); $("kdo").textContent = F.kd.toFixed(2); $("rateo").textContent = F.rate; $("lato").textContent = F.lat;
   $("merro").textContent = (F.merr > 0 ? "+" : "") + F.merr + "%"; $("qmaxo").textContent = F.qmax.toFixed(1); syncSliders();
 }
 const CS_NOTE = { fk: "", ik: "rings: the two IK solutions of the target", jac: "red field: |det J| shrinking toward a singularity", fb: "dashed rings: IK solutions of the moving target" };
 function syncTabProgress() {
   document.querySelectorAll("nav.tabs button").forEach((b) => { const tab = b.dataset.tab, n = L[tab].length; let done = 0; for (let k = 0; k < n; k++) if (DONE[tab + k]) done++;
-    b.querySelector(".prog i").style.width = (100 * done / n) + "%"; b.title = `${done} of ${n} steps done`; });
+    b.querySelector(".prog i").style.transform = `scaleX(${done / n})`; b.title = `${done} of ${n} steps done`; });
 }
 function setTab(tab, apply = true) {
   S.tab = tab; document.querySelectorAll("nav.tabs button").forEach((b) => { b.setAttribute("aria-selected", b.dataset.tab === tab); b.tabIndex = b.dataset.tab === tab ? 0 : -1; });
   $("csNote").textContent = CS_NOTE[tab]; S.fkTrail = [];
   document.querySelectorAll("[data-panel]").forEach((el) => el.classList.toggle("hidden", !el.dataset.panel.split(" ").includes(tab)));
   S.runJ = false; syncRunJ(); S.iter = null; S.hoverQ = null; S.keys = {}; S.wiggle = null; syncBasinsUI();
-  renderEq(); renderLesson(apply); if (tab === "fb") resetFB();
+  renderEq(); renderSyms(); renderLesson(apply); if (tab === "fb") resetFB();
   store.set("tab", tab);
 }
 function syncRunJ() { $("runJ").textContent = S.runJ ? "⏸ Stop" : "▶ Run diff-IK"; }
@@ -1003,8 +1101,10 @@ $("resetJ").onclick = () => { S.anim = { from: S.q.slice(), to: [rad(30), rad(60
 $("runF").onclick = () => { S.fb.running = !S.fb.running; $("runF").textContent = S.fb.running ? "⏸ Pause" : "▶ Run"; };
 $("resetF").onclick = resetFB;
 $("path").addEventListener("change", (e) => { S.fb.path = e.target.value; resetFB(); });
-for (const k of ["kp", "rate", "lat", "merr", "qmax"]) $(k).addEventListener("input", (e) => { S.fb[k] = +e.target.value; outputs(); if (k === "rate") S.fb.nextCtl = S.fb.t; });
+for (const k of ["kp", "kd", "rate", "lat", "merr", "qmax"]) $(k).addEventListener("input", (e) => { S.fb[k] = +e.target.value; outputs(); if (k === "rate") S.fb.nextCtl = S.fb.t; });
 $("ff").addEventListener("change", (e) => { S.fb.ff = e.target.checked; });
+function syncInertiaUI() { $("kdRow").classList.toggle("hidden", !S.fb.inertia); }
+$("inertia").addEventListener("change", (e) => { S.fb.inertia = e.target.checked; syncInertiaUI(); resetFB(); });
 $("theme").onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   r.dataset.theme = dark ? "light" : "dark"; store.set("theme", r.dataset.theme); rebuildWorld(); };
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rebuildWorld);
@@ -1049,8 +1149,8 @@ function readHash() {
   const parts = (location.hash || "").replace(/^#/, "").split("&").filter(Boolean), out = { tab: null, s: {} };
   for (const p of parts) { const [k, v] = p.split("="); if (v == null) { if (["fk", "ik", "jac", "fb"].includes(k)) out.tab = k; continue; }
     const n = parseFloat(v);
-    if (["floor", "shelf", "basins", "ff"].includes(k)) out.s[k] = n; else if (["l1", "l2", "lim", "kp", "rate", "lat", "merr", "qmax", "lam"].includes(k)) out.s[k] = n;
-    else if (k === "path") out.s.path = v; else if (k === "solve") out.solve = n || 1; else if (k === "theme") out.theme = v; else if (k === "warm") out.warm = n; else if (k === "inv") out.s.inv = v; else if (k === "step") out.step = n - 1;
+    if (["floor", "shelf", "basins", "ff", "inertia"].includes(k)) out.s[k] = n; else if (["l1", "l2", "lim", "kp", "kd", "rate", "lat", "merr", "qmax", "lam"].includes(k)) out.s[k] = n;
+    else if (k === "path") out.s.path = v; else if (k === "solve") out.solve = n || 1; else if (k === "iter") out.iter = n; else if (k === "theme") out.theme = v; else if (k === "warm") out.warm = n; else if (k === "inv") out.s.inv = v; else if (k === "step") out.step = n - 1;
     else if (k === "t1" || k === "t2") { out.s.q = out.s.q || [30, 60]; out.s.q[k === "t1" ? 0 : 1] = n; }
     else if (k === "tx" || k === "ty") { out.s.target = out.s.target || [0.866, 1.5]; out.s.target[k === "tx" ? 0 : 1] = n; } }
   return out;
@@ -1060,7 +1160,7 @@ $("copy").onclick = async () => {
   if (S.floor) parts.push("floor=1"); if (S.shelf) parts.push("shelf=1"); if (S.lim < 180) parts.push(`lim=${S.lim}`);
   if (S.tab === "ik") { parts.push(`tx=${S.target[0].toFixed(3)}`, `ty=${S.target[1].toFixed(3)}`); if (S.basins) parts.push("basins=1"); }
   if (S.tab === "jac") parts.push(`inv=${S.inv}`, `lam=${S.lam}`);
-  if (S.tab === "fb") parts.push(`path=${F.path}`, `kp=${F.kp}`, `rate=${F.rate}`, `lat=${F.lat}`, `merr=${F.merr}`, `qmax=${F.qmax}`, `ff=${F.ff ? 1 : 0}`);
+  if (S.tab === "fb") parts.push(`path=${F.path}`, `kp=${F.kp}`, `kd=${F.kd}`, `rate=${F.rate}`, `lat=${F.lat}`, `merr=${F.merr}`, `qmax=${F.qmax}`, `ff=${F.ff ? 1 : 0}`, `inertia=${F.inertia ? 1 : 0}`);
   const url = location.href.split("#")[0] + "#" + parts.join("&");
   try { await navigator.clipboard.writeText(url); toast("Link copied"); } catch (e) { history.replaceState(null, "", url); toast("Link is in the address bar"); }
 };
@@ -1075,9 +1175,11 @@ $("copy").onclick = async () => {
   if (!deep && tab !== "fb") S.q = [rad(-100), rad(160)]; // start folded: the lesson's own setup animates the arm awake
   setTab(tab, !deep); if (deep) applySetup(hsh.s, false);
   if (hsh.theme === "light" || hsh.theme === "dark") { document.documentElement.dataset.theme = hsh.theme; rebuildWorld(); }
-  if (hsh.solve === 2 && tab === "ik") { // instant: run the whole iterative solve now (used for screenshots)
+  if ((hsh.solve === 2 || hsh.iter != null) && tab === "ik") { // instant: run the iterative solve now, optionally only N steps (screenshots, animation frames)
+    const max = hsh.iter != null ? hsh.iter : 150;
     S.iter = { k: 0, err: 0, done: false, acc: 0, path: [S.q.slice()], hand: [fk(S.q).h] };
-    while (!S.iter.done) { const r = ikStep(S.q, S.target); S.q = r.q; S.iter.err = r.err; S.iter.k++; S.iter.path.push(S.q.slice()); S.iter.hand.push(fk(S.q).h); if (r.err < 1e-3 || S.iter.k >= 150) S.iter.done = true; }
+    while (!S.iter.done && S.iter.k < max) { const r = ikStep(S.q, S.target); S.q = r.q; S.iter.err = r.err; S.iter.k++; S.iter.path.push(S.q.slice()); S.iter.hand.push(fk(S.q).h); if (r.err < 1e-3 || S.iter.k >= 150) S.iter.done = true; }
+    if (hsh.iter != null && !S.iter.done) S.iter.done = true; // freeze the frame
     syncSliders();
   } else if (hsh.solve && tab === "ik") setTimeout(() => $("solve").click(), 300);
   if (hsh.warm && tab === "fb") { for (let i = 0; i < hsh.warm / 0.05; i++) stepFB(0.05); } // pre-run the sim (screenshots)
