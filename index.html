@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arm Playground</title>
-<meta name="description" content="Interactive two-joint robot arm for Unit 2 of the Hugging Face Robotics Course: forward and inverse kinematics, configuration space with obstacles, the Jacobian, and feedback control, with guided lessons.">
+<meta name="description" content="Interactive two-joint robot arm for Unit 2 of the Hugging Face Robotics Course: forward and inverse kinematics, configuration space with obstacles, the Jacobian, and feedback control, with guided lessons. A fifth tab unlocks the real five-joint arm in 3D.">
 <meta property="og:title" content="Arm Playground: learn robot kinematics and control by touching it">
 <meta property="og:description" content="FK, IK, configuration space, the Jacobian and feedback control on a two-joint arm, with guided lessons. A companion to Unit 2 of the Hugging Face Robotics Course.">
 <meta property="og:image" content="https://bakulbadwal.github.io/arm-playground/docs/hero.png">
@@ -106,6 +106,19 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .pad { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(2, 34px); gap: 4px; }
 .pad button { padding: 0; }
 .pad .up { grid-column: 2; } .pad .left { grid-column: 1; grid-row: 2; } .pad .down { grid-column: 2; grid-row: 2; } .pad .right { grid-column: 3; grid-row: 2; }
+/* tab 5: the real arm in 3D (arm3d.js) */
+#a3 { aspect-ratio: 7 / 8; touch-action: pan-y; cursor: grab; }
+#a3:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#a3flat { aspect-ratio: 4 / 5; touch-action: pan-y; }
+#a3Status { text-align: right; flex: none; max-width: 60%; }
+#a3Status .pill { white-space: nowrap; }
+.a3views { gap: 6px; margin: 8px 0 0; }
+.a3views button { padding: 4px 10px; font-size: 13px; }
+.a3views input[type=range] { flex: 1; min-width: 80px; max-width: 170px; }
+#a3Joints .ctl label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+#a3Joints .sw { margin-right: 2px; flex: none; }
+details.more ul { padding-left: 18px; margin: 8px 0 0; }
+details.more ul li { margin-bottom: 6px; }
 /* lesson */
 .lesson { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .lesson h3 { font-size: 18px; margin: 2px 0 6px; letter-spacing: -0.01em; }
@@ -147,6 +160,7 @@ body.export canvas { border-radius: 0; }
   .grid { grid-template-columns: 1fr; grid-template-areas: "task" "lesson" "cs" "controls" "math"; }
   .ctl { grid-template-columns: 118px 1fr 56px; }
   .eqc .tex { font-size: 14px; }
+  #a3flat { aspect-ratio: 2 / 3; }
 }
 </style>
 </head>
@@ -156,7 +170,7 @@ body.export canvas { border-radius: 0; }
     <div class="brand">
       <div class="kicker">Companion to the <a href="https://huggingface.co/learn/robotics-course" target="_blank" rel="noopener">Hugging Face Robotics Course</a> · Unit 2 &nbsp;·&nbsp; <a href="datasets.html" title="The Unit 1 page: what LeRobotDataset fetches for a temporal window">Unit 1 · Datasets →</a></div>
       <h1><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 50 L30 34" stroke="var(--link1)" stroke-width="7" stroke-linecap="round"/><path d="M30 34 L50 16" stroke="var(--link2)" stroke-width="7" stroke-linecap="round"/><circle cx="14" cy="50" r="5" fill="var(--bg)"/><circle cx="30" cy="34" r="5" fill="var(--bg)"/></svg>Arm Playground</h1>
-      <p>Robot kinematics and control on the course's two-joint arm. <b>Task space</b> shows where the hand is. <b>Configuration space</b> maps every pair of joint angles (θ₁, θ₂) as one pixel. Follow the lesson on each tab, or just play.</p>
+      <p>Robot kinematics and control on the course's two-joint arm. <b>Task space</b> shows where the hand is. <b>Configuration space</b> maps every pair of joint angles (θ₁, θ₂) as one pixel. Follow the lesson on each tab, or just play. Tab 5 gives the real arm its other joints back, in 3D.</p>
     </div>
     <div class="actions">
       <button id="copy" title="Copy a link to exactly this setup">🔗 Copy link</button>
@@ -169,18 +183,19 @@ body.export canvas { border-radius: 0; }
     <button role="tab" data-tab="ik">2 · Inverse kinematics<span class="prog"><i></i></span></button>
     <button role="tab" data-tab="jac">3 · Jacobian &amp; diff-IK<span class="prog"><i></i></span></button>
     <button role="tab" data-tab="fb">4 · Feedback control<span class="prog"><i></i></span></button>
+    <button role="tab" data-tab="r3">5 · The real arm (3D)<span class="prog"><i></i></span></button>
   </nav>
 
   <div class="eq" id="eq"></div>
   <details class="syms" id="syms"><summary>What do the symbols mean? Tap one to see it on screen.</summary><ul id="symList"></ul></details>
 
   <div class="grid">
-    <section class="card area-task">
+    <section class="card area-task" data-panel="fk ik jac fb">
       <h2><span>Task space · where the hand is</span><span id="taskStatus"></span></h2>
       <canvas id="task" aria-label="Task space view of the arm"></canvas>
       <div class="legend" id="taskLegend"></div>
     </section>
-    <section class="card area-cs" id="csCard">
+    <section class="card area-cs" id="csCard" data-panel="fk ik jac fb">
       <h2><span>Configuration space · (θ₁, θ₂)</span>
         <label class="sub" id="basinWrap" style="margin:0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="basins"> Basins of iterative IK</label></h2>
       <canvas id="cspace" aria-label="Configuration space map: click to set the pose, hover to preview"></canvas>
@@ -194,6 +209,35 @@ body.export canvas { border-radius: 0; }
         <span id="csNote"></span>
         <span>hover = preview · click = go there</span>
       </div>
+    </section>
+    <section class="card area-task" id="a3Card" data-panel="r3">
+      <h2><span>The real arm · SO‑101, drawn from its URDF</span><span id="a3Status"></span></h2>
+      <canvas id="a3" tabindex="0" aria-label="3D view of the five-joint arm. Drag to orbit, or use the arrow keys; plus and minus zoom."></canvas>
+      <div class="row a3views">
+        <button data-a3view="q" title="Three-quarter view">¾ view</button><button data-a3view="side" title="Look straight at the arm's plane">Side</button><button data-a3view="top" title="Look straight down">Top</button><button data-a3view="front" title="Look from the front">Front</button>
+        <button id="a3zout" aria-label="Zoom out" title="Zoom out">−</button><button id="a3zin" aria-label="Zoom in" title="Zoom in">+</button>
+        <label class="sub" for="a3tilt" style="margin:0">Tilt</label><input type="range" id="a3tilt" min="2" max="87" step="1" value="22">
+      </div>
+      <div class="legend" id="a3Legend"></div>
+    </section>
+    <section class="card area-cs" id="a3ViewsCard" data-panel="r3">
+      <h2><span>Two flat views · side and top</span></h2>
+      <canvas id="a3flat" aria-label="Side view (the plane of tabs 1 to 4) above a top view. Drag the green target here when there is one."></canvas>
+      <div class="legend">
+        <span><span class="sw" style="background:color-mix(in srgb, var(--accent) 17%, var(--panel))"></span>where the wrist can go with the lift and elbow inside their limits</span>
+        <span>dashed: tab 1's ring (l₁ + l₂ outside, the elbow's stop inside)</span>
+        <span><span class="sw" style="background:color-mix(in srgb, var(--warn) 14%, var(--panel))"></span>the pan's range</span>
+      </div>
+      <details class="more"><summary>What's exact here, and what's a model</summary>
+        <ul>
+          <li><b>Exact to the robot's description file:</b> joint order, axes, offsets and limits are the SO‑101 URDF's (<a href="https://github.com/TheRobotStudio/SO-ARM100/blob/385e8d7/Simulation/SO101/so101_new_calib.urdf" target="_blank" rel="noopener">TheRobotStudio/SO‑ARM100, <code>so101_new_calib.urdf</code> at commit 385e8d7</a>, Apache‑2.0). A copy sits in this repo, and <code>npm test</code> checks this tab's joint table against it number for number.</li>
+          <li><b>Exact math:</b> forward kinematics, the 116 mm and 135 mm links, the Jacobian (checked against finite differences), and the count 5 &lt; 6.</li>
+          <li><b>A model:</b> the arm is drawn as plain rods through the joint centres, not the printed parts, and the base and shadows are just for depth. The grid is the plane z = 0 of the URDF's base frame; how that sits against a real tabletop depends on the printed base, which isn't drawn. The dots are random joint settings, not the workspace's true edge, and they ignore the arm hitting itself.</li>
+          <li><b>The solver is numerical.</b> When it converges it is within 0.1 mm of the target. It only searches downhill from where it starts, so it can also stop against a joint limit; that is why Solve tries several starting poses before it says a target is out of reach, and why Follow can stall on a target behind the base.</li>
+          <li><b>Also a model:</b> a URDF is an idealised arm. A built one has play in its gears and bends a little, and its calibrated limits differ slightly. The gripper's jaw is left out.</li>
+          <li><b>Units:</b> tabs 1–4 use two links of length 1. This tab is in millimetres, with the real 116 : 135. With the wrist roll at 0 the fingertip sits 18.3 mm to one side of the blue sheet (10 to 26 mm as the roll turns), because the gripper is offset back toward the arm's centreline. The side view looks straight along the joint axes, so that offset doesn't show there.</li>
+        </ul>
+      </details>
     </section>
     <section class="card lesson area-lesson" id="lesson" aria-live="polite">
         <h2><span>Lesson · <span id="lsTab"></span></span><span id="lsCount"></span></h2>
@@ -219,6 +263,7 @@ body.export canvas { border-radius: 0; }
 
     <section class="card area-controls">
       <h2>Controls</h2>
+      <div data-panel="fk ik jac fb">
       <div class="checks">
         <label><input type="checkbox" id="floor"> Floor</label>
         <label><input type="checkbox" id="shelf"> Shelf</label>
@@ -228,6 +273,25 @@ body.export canvas { border-radius: 0; }
       <div class="ctl"><label for="l2">Link 2 length l₂</label><input type="range" id="l2" min="0.4" max="1.6" step="0.05" value="1"><output id="l2o"></output></div>
       <div class="ctl"><label for="lim">Elbow limit |θ₂| ≤</label><input type="range" id="lim" min="30" max="180" step="5" value="180"><output id="limo"></output></div>
       <hr class="sep">
+      </div>
+
+      <div data-panel="r3">
+        <p class="sub" style="margin-top:0">Tick a joint to unlock it. A locked joint is what tabs 1–4 assumed. Slider ranges are the URDF's joint limits in whole degrees (the elbow's ±96.8° shows as ±96°).</p>
+        <div id="a3Joints"></div>
+        <p class="sub hidden" id="a3selfNote"><b>Self-motion is on:</b> turn the <b>Wrist flex</b> slider. Lift and elbow are re-solved each time so the fingertip stays put.</p>
+        <hr class="sep">
+        <div class="checks">
+          <label><input type="checkbox" id="a3plane"> The plane of tabs 1–4</label>
+          <label><input type="checkbox" id="a3cloud"> Reachable points</label>
+          <label><input type="checkbox" id="a3axes"> Joint axes</label>
+          <label><input type="checkbox" id="a3jac"> Jacobian columns</label>
+        </div>
+        <div class="row">
+          <button id="a3solve" class="primary">▶ Solve to the target</button>
+          <label class="sub" style="margin:0;display:inline-flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="a3follow"> Follow the target as I drag it</label>
+        </div>
+        <p class="sub">The green target appears when you solve or follow. Drag it in the 3D view (it slides in the screen's plane) or, more precisely, in either flat view. On a phone, use the flat views: put your finger on the target.</p>
+      </div>
 
       <div data-panel="fk jac ik">
         <div class="ctl"><label for="t1">θ₁ shoulder</label><input type="range" id="t1" min="-180" max="180" step="1" value="30"><output id="t1o"></output></div>
@@ -379,7 +443,7 @@ function hexToRgb(h) {
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
 }
 function rebuildWorld() {
-  cssCache = {};
+  cssCache = {}; if (typeof A3 !== "undefined" && A3.ready) Arm3D.invalidate();
   const off = document.createElement("canvas"); off.width = N; off.height = N;
   const g = off.getContext("2d"), im = g.createImageData(N, N);
   const cols = [css("--free-c"), css("--floor-c"), css("--shelf-c"), css("--limit-c")].map(hexToRgb);
@@ -703,6 +767,9 @@ const EQ = {
        ["\\cos\\theta_2=\\frac{r^2-l_1^2-l_2^2}{2\\,l_1l_2}", "Closed form for two links; the ± on θ₂ gives A and B"]],
   jac: [["\\dot p = J(q)\\,\\dot q", "Joint speeds in, hand speed out"], ["\\dot q = J(q)^{+}\\,\\dot p^*", "Differential IK: invert it"], ["\\det J = l_1 l_2\\sin\\theta_2", "Zero when the arm is straight or folded"]],
   fb: [["\\dot q = J(q)^{+}\\big(\\dot p^* + k_p\\,\\Delta p\\big)", "Plan's velocity plus a push toward the measured error"], ["e_{k+1}=(1-k_p\\Delta t)\\,e_k", "Discrete update: smooth if k_pΔt < 1, unstable if > 2"]],
+  r3: [["p(q)=T_0R(q_1)\\;T_1R(q_2)\\cdots T_4R(q_5)\\;T_{\\text{tip}}", "Forward kinematics in 3D: for each joint a fixed step T, then a turn R, multiplied in order"],
+       ["J=\\frac{\\partial p}{\\partial q}\\ \\text{ is } 3\\times 5", "Five joint angles in, three numbers (x, y, z) out. Not square, so there is no J⁻¹"],
+       ["\\dot q = J^{\\top}\\big(JJ^{\\top}+\\lambda^2 I\\big)^{-1}\\dot p^*", "Tab 3's damped J⁺, unchanged: it never needed J to be square"]],
 };
 function renderEq() {
   $("eq").innerHTML = EQ[S.tab].map(([tex, gloss], i) => `<div class="eqc"><div class="tex" id="tex${i}"></div><div class="gloss">${gloss}</div></div>`).join("");
@@ -740,15 +807,23 @@ const SYMS = {
        ["Δt", "how long between controller updates: 1 / control rate", "rate"],
        ["d", "latency measured in controller ticks", "lat"],
        ["e_k", "the error at tick k, in the bar chart under the math panel", "bars"]],
+  r3: [["q = (q₁ … q₅)", "the five joint angles: shoulder pan, shoulder lift, elbow, wrist flex, wrist roll (the five sliders)", "q5"],
+       ["θ₁, θ₂", "the two angles of tabs 1–4, drawn in the side view. Here they come from the lift and elbow joints, which the robot's file counts the other way from their own zeros: θ₁ = 76.0° − lift, θ₂ = −73.8° − elbow", "a3flat"],
+       ["Tₖ", "a fixed step from one joint to the next: a shift and a tilt read from the robot's description file (its URDF). It never changes", null],
+       ["R(qₖ)", "a turn by the angle qₖ about joint k's own axis. Tick 'Joint axes' to see all five", "a3axes"],
+       ["p(q)", "where the fingertip is: (x, y, z) in millimetres, in the URDF's base frame (x points out of the arm's front, z is up)", null],
+       ["J", "one column per joint: the way the fingertip moves when only that joint turns. Tick 'Jacobian columns' to see them as arrows", "a3jac"],
+       ["J⁺", "the pseudo-inverse: of all the joint motions that move the fingertip the way you asked, the smallest one", "a3solve"]],
 };
-const HL_DOM = { q: ["t1", "t2"], l: ["l1", "l2"], lam: ["lam"], kp: ["kp"], kd: ["kd"], ff: ["ff"], rate: ["rate"], lat: ["lat"], bars: ["bars"] };
+const HL_DOM = { q: ["t1", "t2"], l: ["l1", "l2"], lam: ["lam"], kp: ["kp"], kd: ["kd"], ff: ["ff"], rate: ["rate"], lat: ["lat"], bars: ["bars"],
+  q5: ["a3q0", "a3q1", "a3q2", "a3q3", "a3q4"], a3flat: ["a3flat"], a3axes: ["a3axes"], a3jac: ["a3jac"], a3solve: ["a3solve"] };
 function renderSyms() {
   $("symList").innerHTML = SYMS[S.tab].map(([sym, txt, key]) => `<li><button class="sym" ${key ? `data-hl="${key}"` : "disabled"}>${sym}</button><span>${txt}</span></li>`).join("");
   $("symList").querySelectorAll("button[data-hl]").forEach((b) => b.addEventListener("click", () => highlight(b.dataset.hl)));
 }
 function highlight(key) {
   S.hl = { key, t0: performance.now() };
-  for (const id of HL_DOM[key] || []) { const el = $(id), box = el.closest(".ctl") || el.closest("label") || el; box.classList.add("hl"); setTimeout(() => box.classList.remove("hl"), 1700); }
+  for (const id of HL_DOM[key] || []) { const el = $(id); if (!el) continue; const box = el.closest(".ctl") || el.closest("label") || el; box.classList.add("hl"); setTimeout(() => box.classList.remove("hl"), 1700); }
 }
 // pulsing ring at a canvas point while a symbol is highlighted
 function pulse(ctx, x, y, color) {
@@ -897,8 +972,38 @@ function drawPlot() {
   ctx.fillStyle = css("--muted"); ctx.font = "11px ui-monospace, Menlo, monospace"; ctx.fillText("max " + ymax.toFixed(2), 4, 12);
 }
 
+// ================= lessons: tab 5 (data) =================
+// Setups are in degrees, in joint order (pan, lift, elbow, wrist flex, wrist roll). `free` is one digit per joint, 1 = unlocked.
+// `key` names the check in test.mjs that recomputes the typed answer from the kinematics.
+const L_R3 = [
+  { t: "The plane was a slice", setup: { q: [0, 0, 0, 0, 0], free: "01100" },
+    b: "<p>This is the same arm as tabs 1–4, now drawn from the robot's own description file: the URDF of the <b>SO‑101</b>, the current revision of the course's SO‑100. Three of its five arm joints are locked, which is the arm the course asked you to imagine. (Tab 1 said four: it also counted the sixth motor, which opens the jaw and is left out here.)</p><p>The <b>blue sheet</b> is the flat plane you have been working in, and the dashed ring on it is tab 1's reach circle. The <b>side view</b> in the other pane is that sheet seen face-on: it <i>is</i> tabs 1–4, with θ₁ and θ₂ marked. Drag the 3D view to look around, then move the two unlocked sliders. The wrist never leaves the sheet.</p><p>Two things the course rounded off. It drew two equal links; the real upper arm is <b>116 mm</b> and the real forearm is <b>135 mm</b>. And the robot's file counts each joint from its own zero, in its own direction, so the sliders are not θ₁ and θ₂ themselves: θ₁ = 76.0° − lift and θ₂ = −73.8° − elbow.</p>",
+    ask: { type: "num", key: "reachOuter", q: "Upper arm 116 mm, forearm 135 mm. What is the farthest the wrist can get from the shoulder-lift joint, in mm?", a: 251, tol: 0.5,
+      why: "116 + 135 = 251 mm, with the elbow straight. That's tab 1's outer circle, l₁ + l₂, and the arm has just straightened to touch it. The inner circle is new: this elbow stops before the arm folds flat, so the wrist can't come closer than 27.9 mm. The shaded part of the side view is smaller than the ring, because the shoulder has limits too.", after: { q: [0, 20, -73.8, 0, 0] } } },
+  { t: "Unlock the pan", setup: { q: [-35, 0, 0, 0, 0], free: "11100", cloud: 1, dist: 1020 },
+    b: "<p>The <b>shoulder pan</b> is unlocked now: the amber joint at the base. Slide it. The whole sheet swings about a vertical axis, like a door on its hinge. The top view shows it best.</p><p>The dots are wrist positions, sampled by setting the three free joints at random (the legend under the picture gives the count). One flat ring, swept around the hinge, has become a <b>volume</b>. A position now takes three numbers (x, y, z), and there are three free joints to supply them.</p>",
+    ask: { type: "num", key: "panHeight", q: "Slide only the pan, from one end of its range to the other (−110° to +110°). By how many mm does the wrist's height z change?", a: 0, tol: 0.05,
+      why: "0 mm. The pan axis is vertical, so it carries the whole arm around at a fixed height; only x and y change (watch z in the math panel). Worked from the URDF's own rounded numbers the height wobbles by under 0.01 mm, because the file writes π as 3.14159." } },
+  { t: "Three joints for two numbers", setup: { q: [0, -23, 40, 11, 0], free: "01110", mode: "self" },
+    b: "<p>The pan is locked again, so the arm is back in its plane. But the <b>wrist</b> is unlocked: three joints now move in a plane where the fingertip only needs two numbers, how far out and how high.</p><p>Turn the <b>Wrist flex</b> slider. Each time, the lab re-solves the lift and the elbow so the fingertip stays exactly where it is. The arm slides through pose after pose and the fingertip never moves. Roboticists call that a <i>self-motion</i>.</p>",
+    ask: { type: "mc", q: "With these three joints free, how many poses put the fingertip on this exact spot?", o: ["Exactly 2, like A and B in tab 2", "A continuous family: one for every wrist angle in a range", "Exactly 1"], a: 1,
+      why: "One spare joint is one spare choice: you pick the wrist angle and the other two joints make up for it. Tab 2's tidy 'A or B' is gone, and so is its two-line formula; this lab solves it numerically instead. Even 'A or B' was generous for the real arm: measured as tab 2's θ₂, this elbow runs from −170.7° to only +23°, so most targets have just one of the two." } },
+  { t: "The map no longer fits", setup: { q: [-20, -20, 30, 20, 0], free: "11111", cloud: 1, plane: 0, dist: 1320 },
+    b: "<p>In tabs 1–4 the second pane was a <b>map</b>: every pose of the arm was one pixel, because a pose was two angles and a screen has two directions. That map is where you saw obstacles, the two IK answers, and the solver's basins.</p><p>All five joints are unlocked now. The dots are sampled fingertip positions: a sketch of the arm's workspace (it ignores the arm bumping into itself or its base). Orbit around it.</p>",
+    ask: { type: "num", key: "N", q: "With five joints free, how many numbers does it take to name one pose of the arm?", a: 5, tol: 0.1,
+      why: "Five: one angle per joint. A map of every pose would need five dimensions, so it can't be a picture any more. A grid over two angles at 5° steps has 72 × 72 = 5,184 cells; the same grid over this arm's five joint ranges has about 166 million. The obstacles and the families of solutions still live in that space, but nobody can look at it, which is why real planners <i>sample</i> it." } },
+  { t: "Why the course writes J⁺", setup: { q: [0, -20, 30, 20, 0], free: "11111", jac: 1, plane: 0, target: [250, 120, 170], mode: "follow" },
+    b: "<p>Tab 3's Jacobian was a 2 × 2 table, one column per joint, and you could invert it. Each joint still has its own arrow at the fingertip (drawn now, one colour per joint; the wrist roll's is too short to see, about 8 mm per radian), but the fingertip's position is only three numbers. So the table is <b>3 rows × 5 columns</b>. The math panel prints it.</p><p><b>Drag the green target</b>, in the 3D view or in either flat view. The arm follows using the same formula as tab 3, q̇ = Jᵀ(JJᵀ + λ²I)⁻¹ ṗ*. It never needed J to be square: out of all the joint motions that move the fingertip the right way, it takes the smallest.</p>",
+    ask: { type: "mc", q: "J is now 3 × 5. Can it be inverted the way tab 3's plain inverse was?", o: ["Yes. Any table of numbers has an inverse", "No. Only a square table has an inverse. Five joints for three numbers leaves freedom to spare, and J⁺ uses it to pick the smallest motion", "No, because turns in 3D can't be written in a table"], a: 1,
+      why: "That's why the course writes J⁺ and not J⁻¹: the plus is what copes with a table that isn't square. The freedom to spare is the self-motion you felt two steps ago." } },
+  { t: "Five joints, six numbers", setup: { q: [-30, -30, 50, 30, 40], free: "11111", triad: 1, plane: 0 },
+    b: "<p>So far we only asked <i>where</i> the fingertip is: three numbers. To pick up a cup the gripper also has to be turned the right way: which way it points (two numbers) and how far it is twisted about that line (one more). Those three are its <i>orientation</i>, drawn as the red, green and blue arrows on the fingertip. Position plus orientation is <b>six numbers</b>.</p><p>The math panel now shows the full Jacobian: six rows, five columns. Five joints can change those six numbers in at most five independent ways.</p>",
+    ask: { type: "mc", q: "Can this arm put its fingertip at any reachable point, turned any way you choose?", o: ["Yes, given enough joint range", "No. Five joints supply five numbers; position plus orientation needs six, so one way of moving is always missing", "Only close to the base"], a: 1,
+      why: "At most five of the six rows are independent, and 5 &lt; 6 (the panel counts them live). On this arm the missing motion is the gripper's heading: it always points along the arm's own sheet, so it can't swing left or right without the whole arm panning. And look at what this tab needed for one small arm: a chain of matrices, a table that isn't square, a numerical solver, joint limits, and a map of poses nobody can draw. Add a camera, contact, friction and a soft object, and the hand-written model runs out. That is where Unit 2 ends, and why the rest of the course <b>learns the mapping from data</b>." } },
+];
 // ================= lessons =================
 const L = {
+  r3: L_R3,
   fk: [
     { t: "Two links, two angles", setup: { q: [30, 60], l1: 1, l2: 1, floor: 0, shelf: 0, lim: 180 },
       b: "<p>This is the course's SO‑100 arm with four joints locked, so it moves in a flat plane. You control just two numbers, <b>q = (θ₁, θ₂)</b>: the shoulder angle and the elbow angle.</p><p>The left pane shows where that puts the hand. The right pane is a <b>map of every possible q</b>, and the black dot is you. Drag the θ sliders and watch both move.</p>" },
@@ -984,6 +1089,7 @@ const MORE = {
   ik: ["Turn on Basins, then drag the target slowly. The basin boundary bends and moves.", "Put the target exactly on the outer circle: A and B merge into a single ring.", "With the floor on, find a target where A is valid and B is blocked, then the reverse."],
   jac: ["Fold the arm back (θ₂ near ±180°) and look at the ellipse: the other singularity.", "Teleop into a straight arm with the plain inverse selected, and watch the joint-speed pill.", "Change l₂ and watch det J = l₁l₂ sin θ₂ scale with it."],
   fb: ["Circle target with feed-forward OFF: the hand lags behind the box by a steady amount. Raise k_p to shrink the lag.", "Negative model error (−30%) and k_p = 0: the drift goes the other way.", "Drag mode: fling the target around and watch the joint speed limit clip the response."],
+  r3: ["Lock everything except the pan and tick 'Reachable points': the workspace collapses to a single arc.", "Unlock all five joints, tick Follow, and drag the target far out in front of the arm. It stretches toward the target and stops: tab 2's 'closest feasible pose', in 3D. Now drag it behind the base: this downhill search can stall against a joint limit before it finds the closest pose.", "Unlock only the lift and elbow, tick 'Jacobian columns', and straighten the elbow until the wrist touches the dashed ring: the two arrows line up. That is tab 3's singularity, still here.", "Unlock only the wrist roll and turn it: the fingertip barely moves, because it sits just 7.9 mm off the roll axis. The J column in the math panel is in single digits."],
 };
 // Every step starts from its tab's baseline so nothing leaks in from another tab (link lengths, limits, obstacles, inverse type).
 const BASE = {
@@ -991,11 +1097,13 @@ const BASE = {
   ik: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, basins: 0 },
   jac: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, inv: "plain", lam: 0.1 },
   fb: { l1: 1, l2: 1, lim: 180, floor: 0, shelf: 0, q: [30, 60], qmax: 8, ff: 1, merr: 0, lat: 0, rate: 50, kd: 0, inertia: 0 },
+  r3: { q: [0, 0, 0, 0, 0], free: "01100", plane: 1, cloud: 0, axes: 0, jac: 0, triad: 0, mode: "", target: null, view: "q", dist: 860 },
 };
 const stepSetup = (tab, i) => ({ ...BASE[tab], ...L[tab][i].setup });
-let LS = store.get("ls", { fk: 0, ik: 0, jac: 0, fb: 0 }), DONE = store.get("done", {});
+let LS = { fk: 0, ik: 0, jac: 0, fb: 0, r3: 0, ...store.get("ls", {}) }, DONE = store.get("done", {});
 function applySetup(s, animate = true) {
   if (!s) return;
+  if (S.tab === "r3") { A3.apply(s, animate); return; } // tab 5 keeps its own state, in arm3d.js
   let world = false;
   for (const k of ["l1", "l2", "lim"]) if (s[k] != null) { S[k] = s[k]; $(k).value = s[k]; world = true; }
   for (const k of ["floor", "shelf"]) if (s[k] != null) { S[k] = !!s[k]; $(k).checked = !!s[k]; world = true; }
@@ -1019,7 +1127,7 @@ function applySetup(s, animate = true) {
 }
 function renderLesson(apply) {
   const list = L[S.tab], i = clamp(LS[S.tab], 0, list.length - 1), st = list[i];
-  $("lsTab").textContent = { fk: "Forward kinematics", ik: "Inverse kinematics", jac: "Jacobian", fb: "Feedback" }[S.tab];
+  $("lsTab").textContent = { fk: "Forward kinematics", ik: "Inverse kinematics", jac: "Jacobian", fb: "Feedback", r3: "The real arm (3D)" }[S.tab];
   $("lsCount").textContent = `${i + 1} / ${list.length}`;
   $("lsTitle").textContent = st.t; $("lsBody").innerHTML = st.b;
   $("lsDots").innerHTML = list.map((_, k) => `<button aria-label="Step ${k + 1}" class="${k === i ? "cur" : DONE[S.tab + k] ? "done" : ""}" data-k="${k}"></button>`).join("");
@@ -1047,14 +1155,14 @@ function renderLesson(apply) {
   if (apply) applySetup(stepSetup(S.tab, i));
 }
 $("lsPrev").onclick = () => { LS[S.tab] = Math.max(0, LS[S.tab] - 1); store.set("ls", LS); renderLesson(true); };
-const TABS = ["fk", "ik", "jac", "fb"];
+const TABS = ["fk", "ik", "jac", "fb", "r3"];
 $("lsNext").onclick = () => {
   const n = L[S.tab].length, i = LS[S.tab];
   if (!L[S.tab][i].ask) { DONE[S.tab + i] = 1; store.set("done", DONE); }
   if (i < n - 1) { LS[S.tab]++; store.set("ls", LS); renderLesson(true); return; }
   const next = TABS[TABS.indexOf(S.tab) + 1];
-  if (next) { toast("Tab complete. On to " + { ik: "inverse kinematics", jac: "the Jacobian", fb: "feedback control" }[next] + "."); setTab(next); }
-  else toast("That's all four tabs. The free-play experiments below go further.");
+  if (next) { toast("Tab complete. On to " + { ik: "inverse kinematics", jac: "the Jacobian", fb: "feedback control", r3: "the real arm, in 3D" }[next] + "."); setTab(next); }
+  else toast("That's all five tabs. The free-play experiments below go further.");
 };
 $("lsSetup").onclick = () => applySetup(stepSetup(S.tab, LS[S.tab]));
 
@@ -1062,6 +1170,7 @@ $("lsSetup").onclick = () => applySetup(stepSetup(S.tab, LS[S.tab]));
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.tab === "r3") { requestAnimationFrame(frame); if (A3.ready) Arm3D.frame(now); return; } // ask for the next frame first: an error in tab 5 must not stop the loop
   if (S.anim) { const u = clamp((now - S.anim.t0) / S.anim.dur, 0, 1), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
     S.q = [0, 1].map((k) => wrap(S.anim.from[k] + wrap(S.anim.to[k] - S.anim.from[k]) * e)); if (u >= 1) { S.q = S.anim.to.slice(); S.anim = null; } syncSliders(); }
   if (S.tab === "jac") {
@@ -1094,7 +1203,21 @@ function outputs() {
   const F = S.fb; $("kpo").textContent = F.kp.toFixed(1); $("kdo").textContent = F.kd.toFixed(2); $("rateo").textContent = F.rate; $("lato").textContent = F.lat;
   $("merro").textContent = (F.merr > 0 ? "+" : "") + F.merr + "%"; $("qmaxo").textContent = F.qmax.toFixed(1); syncSliders();
 }
-const CS_NOTE = { fk: "", ik: "rings: the two IK solutions of the target", jac: "red field: |det J| shrinking toward a singularity", fb: "dashed rings: IK solutions of the moving target" };
+// tab 5 lives in arm3d.js, fetched the first time the tab is opened. A plain script tag, so it also works from a downloaded copy.
+const A3 = { ready: false, loading: false, queue: [], hash: null,
+  load() {
+    if (this.ready || this.loading) return; this.loading = true; $("math").textContent = "Loading the 3D arm…";
+    const el = document.createElement("script"); el.src = "arm3d.js";
+    el.onload = () => { this.loading = false;
+      try { Arm3D.init({ css, toast }); for (const st of this.queue) Arm3D.apply(st, false); this.queue = [];
+        if (this.hash) { Arm3D.readParams(this.hash); this.hash = null; } this.ready = true; }
+      catch (err) { $("math").textContent = "The 3D tab hit an error while starting: " + err.message; } };
+    el.onerror = () => { this.loading = false; $("math").textContent = "Couldn't load arm3d.js.\nIf you saved this page to open it offline, save arm3d.js into the same folder."; toast("The 3D tab's file (arm3d.js) didn't load."); };
+    document.head.appendChild(el);
+  },
+  apply(s, animate) { if (this.ready) Arm3D.apply(s, animate); else { this.queue.push(s); this.load(); } },
+};
+const CS_NOTE = { r3: "", fk: "", ik: "rings: the two IK solutions of the target", jac: "red field: |det J| shrinking toward a singularity", fb: "dashed rings: IK solutions of the moving target" };
 function syncTabProgress() {
   document.querySelectorAll("nav.tabs button").forEach((b) => { const tab = b.dataset.tab, n = L[tab].length; let done = 0; for (let k = 0; k < n; k++) if (DONE[tab + k]) done++;
     b.querySelector(".prog i").style.transform = `scaleX(${done / n})`; b.title = `${done} of ${n} steps done`; });
@@ -1105,6 +1228,7 @@ function setTab(tab, apply = true) {
   document.querySelectorAll("[data-panel]").forEach((el) => el.classList.toggle("hidden", !el.dataset.panel.split(" ").includes(tab)));
   S.runJ = false; syncRunJ(); S.iter = null; S.hoverQ = null; S.keys = {}; S.wiggle = null; syncBasinsUI();
   renderEq(); renderSyms(); renderLesson(apply); if (tab === "fb") resetFB();
+  if (tab === "r3") { if (A3.ready) Arm3D.invalidate(); else A3.load(); }
   store.set("tab", tab);
 }
 function syncRunJ() { $("runJ").textContent = S.runJ ? "⏸ Stop" : "▶ Run diff-IK"; }
@@ -1181,7 +1305,7 @@ window.addEventListener("resize", () => { reachImg = null; });
 // deep links:  #ik&floor=1&shelf=1&t1=30&t2=60&tx=1&ty=1&step=3 ...
 function readHash() {
   const parts = (location.hash || "").replace(/^#/, "").split("&").filter(Boolean), out = { tab: null, s: {} };
-  for (const p of parts) { const [k, v] = p.split("="); if (v == null) { if (["fk", "ik", "jac", "fb"].includes(k)) out.tab = k; continue; }
+  for (const p of parts) { const [k, v] = p.split("="); if (v == null) { if (["fk", "ik", "jac", "fb", "r3"].includes(k)) out.tab = k; continue; }
     const n = parseFloat(v);
     if (["floor", "shelf", "basins", "ff", "inertia"].includes(k)) out.s[k] = n; else if (["l1", "l2", "lim", "kp", "kd", "rate", "lat", "merr", "qmax", "lam"].includes(k)) out.s[k] = n;
     else if (k === "path") out.s.path = v; else if (k === "solve") out.solve = n || 1; else if (k === "iter") out.iter = n; else if (k === "theme") out.theme = v; else if (k === "warm") out.warm = n; else if (k === "export") out.export = v;
@@ -1192,6 +1316,11 @@ function readHash() {
   return out;
 }
 $("copy").onclick = async () => {
+  if (S.tab === "r3") { // tab 5: pose, free joints, camera and toggles
+    const url = location.href.split("#")[0] + "#" + ["r3", `step=${LS.r3 + 1}`, ...(A3.ready ? Arm3D.linkParams() : [])].join("&");
+    try { await navigator.clipboard.writeText(url); toast("Link copied"); } catch (e) { history.replaceState(null, "", url); toast("Link is in the address bar"); }
+    return;
+  }
   const F = S.fb, parts = [S.tab, `step=${LS[S.tab] + 1}`, `t1=${Math.round(deg(S.q[0]))}`, `t2=${Math.round(deg(S.q[1]))}`, `l1=${S.l1}`, `l2=${S.l2}`];
   if (S.floor) parts.push("floor=1"); if (S.shelf) parts.push("shelf=1"); if (S.lim < 180) parts.push(`lim=${S.lim}`);
   if (S.tab === "ik") { parts.push(`tx=${S.target[0].toFixed(3)}`, `ty=${S.target[1].toFixed(3)}`); if (S.basins) parts.push("basins=1"); }
@@ -1209,6 +1338,7 @@ $("copy").onclick = async () => {
   if (hsh.step != null) LS[tab] = clamp(hsh.step, 0, L[tab].length - 1);
   const deep = Object.keys(hsh.s).length > 0;
   if (!deep && tab !== "fb") S.q = [rad(-100), rad(160)]; // start folded: the lesson's own setup animates the arm awake
+  if (tab === "r3" && /[&#](q|free|cam|plane|cloud|axes|cols|triad|tg|mode|view|n)=/.test(location.hash)) A3.hash = location.hash; // applied once arm3d.js has loaded
   setTab(tab, !deep); if (deep) applySetup(hsh.s, false);
   if (hsh.theme === "light" || hsh.theme === "dark") { document.documentElement.dataset.theme = hsh.theme; rebuildWorld(); }
   if (["task", "cs", "both"].includes(hsh.export)) { S.export = hsh.export; document.body.classList.add("export", "export-" + hsh.export); reachImg = null; }
