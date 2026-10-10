@@ -12,6 +12,7 @@
 <p align="center">
   <b>Learn robot kinematics and control by touching them.</b><br>
   An interactive two-joint arm with 30 guided lessons, the last six on the real five-joint arm in 3D,<br>
+  plus the <b>Workbench</b>: a playable 3D bench where you drive the SO‑101, record your driving, replay it blind and teach a small policy,<br>
   built as a companion to
   <a href="https://huggingface.co/learn/robotics-course/unit2/1">Unit 2 · Classical Robotics</a> of the <a href="https://huggingface.co/learn/robotics-course">Hugging Face Robotics Course</a>,<br>
   plus a <a href="https://bakulbadwal.github.io/arm-playground/datasets.html">second page for Unit 1</a>: what <code>LeRobotDataset</code> actually fetches when you ask for a temporal window.
@@ -20,6 +21,7 @@
 <p align="center">
   <a href="https://bakulbadwal.github.io/arm-playground/"><b>▶ Open the playground</b></a> ·
   <a href="https://bakulbadwal.github.io/arm-playground/#r3&step=1"><b>▶ The real arm in 3D</b></a> ·
+  <a href="https://bakulbadwal.github.io/arm-playground/workbench.html"><b>▶ Workbench</b></a> ·
   <a href="https://bakulbadwal.github.io/arm-playground/datasets.html"><b>▶ Unit 1 · Datasets</b></a> ·
   <a href="#whats-inside">What's inside</a> ·
   <a href="#how-it-compares">How it compares</a> ·
@@ -105,6 +107,31 @@ Tabs 1–4 teach the course's simplification: two joints, one flat plane. Tab 5 
   </tr>
 </table>
 
+## The Workbench: drive it, record it, replay it, teach it
+
+<p align="center">
+  <a href="https://bakulbadwal.github.io/arm-playground/workbench.html"><img src="docs/workbench.png" width="900" alt="The Workbench: a lit 3D bench with the yellow SO-101 arm, a red cube and a blue bin on a cutting mat; a mission card on the left, the six joint numbers under their LeRobot names on the right, and a wrist-camera inset in the corner"></a>
+  <br><sub><b>Mission 1.</b> Drive the gripper with the keyboard or a thumb stick; the corner inset is the wrist camera, the image a policy would be fed.</sub>
+</p>
+
+Tabs 1–5 let you inspect an arm. The [Workbench](https://bakulbadwal.github.io/arm-playground/workbench.html) lets you operate one, and operating is what the rest of the course is about: LeRobot's method is teleoperate, record, train, deploy. Seven missions, each with a predict-then-check question, each one a course idea you feel before you read it:
+
+| # | Mission | The idea | Course |
+|---|---|---|---|
+| 1 | Put the cube in the bin | Cartesian teleoperation: tab 3's damped pseudo-inverse running under your thumbs | Unit 2 |
+| 2 | Now do it joint by joint | Why a leader arm exists: a straight line in the room is a curve in joint space | Unit 2 |
+| 3 | Reach the far corner | Joint limits and the workspace, felt as the hand refusing to go | Unit 2 |
+| 4 | Record a demonstration | Your episode as rows: 30 a second, six numbers of state and six of action, under the real `LeRobotDataset` names | Unit 1 |
+| 5 | Replay it blind | The cube is moved 4 cm and your recording replays: the jaws close on air, because a replay never looks | Unit 2 |
+| 6 | Drive through lag | Every command lands 200 ms late; tab 4's latency lesson, in your hands | Unit 2 |
+| 7 | Teach it | A small network trains in the page on your own demonstrations and is scored on eight spots it never saw. One demo is hit or miss; four from different spots make it reliable | Unit 4 |
+
+**What's exact:** the arm's joints, lengths and limits are the SO‑101 URDF's, the same tested `K3` code as tab 5; the control is damped least squares on four joints for four numbers (x, y, z and the jaws' pitch), checked in the tests to 1 mm; a recording replays its own joint path bit for bit; the lag queue delays a command by exactly six frames at 30 updates a second.
+
+**What's a toy, and says so on the page:** the arm is simplified shapes in the real colours; grasping is one rule (the closed jaws take the cube if its centre is within 21 mm of the fingertip) with no contact physics; falling is plain gravity onto flat surfaces; the policy is a small network that is handed the cube's position, where the course's ACT has to find it in camera images.
+
+**How it is built:** `workbench.html` + `workbench.js`, with three.js r149 vendored as a plain script (`docs/vendor/three.min.js`, MIT) so the page still opens from a downloaded copy; no build step. The core of `workbench.js` (control, world, grasp, recorder, replay, lag, the policy's training) is pure and runs in `npm test`; the view is a three.js layer over it. Training runs in a Web Worker, with a same-thread fallback for `file://`. Without WebGL the page points you to tab 5, which draws the same arm on a plain canvas.
+
 ## The Unit 1 page: datasets in practice
 
 Unit 1's only code (page 1.4) is about `delta_timestamps`: asking `LeRobotDataset` for a window of past observations and future actions around one frame. The course explains it with a static diagram. [`datasets.html`](https://bakulbadwal.github.io/arm-playground/datasets.html) makes it live, against the real facts of `lerobot/svla_so101_pickplace` (50 episodes, 11,939 frames, 30 fps, six motors, two 480×640 cameras) and the fetch rule in lerobot 0.6.1's `dataset_reader.py`:
@@ -130,9 +157,10 @@ Two-link arm visualisers are a well-worn genre. I checked the closest ones again
 | Jacobian columns + manipulability ellipse | ✓ | — | ✓ | ✓ (index / SVD) |
 | Singularity blow-up, plain vs damped inverse | ✓ | — | described | detection |
 | **Feedback control** with gain, rate, latency, model error, saturation | ✓ | — | — | — |
-| Guided lessons with predict-then-check questions | ✓ (30) | quick-start list | written explainer | — |
+| Guided lessons with predict-then-check questions | ✓ (30, plus 7 Workbench missions) | quick-start list | written explainer | — |
 | PD control on an arm with inertia (spring + damper) | ✓ | — | — | — |
-| More than two joints / 3‑D / DH tables | 5 joints in 3‑D from the URDF (tab 5); no DH tables | — | — | ✓ |
+| More than two joints / 3‑D / DH tables | 5 joints in 3‑D from the URDF (tab 5 and the Workbench); no DH tables | — | — | ✓ |
+| Teleoperate, record an episode, replay it, train a policy on it | ✓ (Workbench) | — | — | — |
 | Trajectories, waypoints, export | — | ✓ | — | path trace + CSV export |
 
 Use CompuTools for 6‑DOF arms and DH parameters, and ArmLab for trajectory planning. Use this one to understand *why* Unit 2 ends by arguing for learning. For a comparison of iterative IK solvers (CCD, FABRIK, Jacobian transpose), see [Saeed Ghorbani's interactive post](https://saeed1262.github.io/blog/2025/inverse-kinematics-models/). If I've mischaracterised a tool, open an issue.
@@ -159,6 +187,7 @@ Any setup can be shared as a link (use the 🔗 button). Parameters go after `#t
 | `cam` | Tab 5: camera yaw, tilt (degrees) and distance (mm) | `cam=-52,22,860` |
 | `plane`, `cloud`, `axes`, `cols`, `triad` | Tab 5 toggles: the plane of tabs 1–4, reachable points, joint axes, Jacobian columns, fingertip orientation | `cloud=1&cols=1` |
 | `tg`, `mode` | Tab 5: target x,y,z in mm; `mode=follow` tracks it, `mode=self` holds the fingertip while the wrist turns | `tg=250,120,170&mode=follow` |
+| `m` (on `workbench.html`) | Start the Workbench at mission 1–7 | `workbench.html#m=5` |
 
 Try it: [both IK solutions blocked by a shelf](https://bakulbadwal.github.io/arm-playground/#ik&floor=1&shelf=1&tx=1.2&ty=1.35&t1=79&t2=-54) · [iterative IK racing to a basin](https://bakulbadwal.github.io/arm-playground/#ik&basins=1&t1=-120&t2=-30&tx=0.866&ty=1.5&solve=1) · [latency turns a safe gain unstable](https://bakulbadwal.github.io/arm-playground/#fb&path=step&kp=30&rate=50&lat=60) · [the real arm with its pan unlocked](https://bakulbadwal.github.io/arm-playground/#r3&step=2) · [five joints following a target in 3D](https://bakulbadwal.github.io/arm-playground/#r3&step=5)
 
@@ -168,13 +197,15 @@ Try it: [both IK solutions blocked by a shelf](https://bakulbadwal.github.io/arm
 npm test
 ```
 
-Thirty checks, no dependencies (Node 18+). They slice the math out of the pages and verify it against identities and the lessons' own worked examples: FK↔IK round-trips, the Jacobian against finite differences, det J = l₁l₂ sin θ₂, the closed-form solutions for the lesson targets, that the damped pseudo-inverse stays finite where the plain inverse fails, and, for the Unit 1 page, that the `delta_timestamps` fetch rule reproduces LeRobot's frame indices, clamping and `is_pad` masks.
+Thirty-eight checks, no dependencies (Node 18+). They slice the math out of the pages and verify it against identities and the lessons' own worked examples: FK↔IK round-trips, the Jacobian against finite differences, det J = l₁l₂ sin θ₂, the closed-form solutions for the lesson targets, that the damped pseudo-inverse stays finite where the plain inverse fails, and, for the Unit 1 page, that the `delta_timestamps` fetch rule reproduces LeRobot's frame indices, clamping and `is_pad` masks.
 
 Fourteen of them cover tab 5: the joint table equals the vendored URDF number for number; forward kinematics matches known poses from an independent implementation (`python3 docs/vendor/reference_fk.py`) and a quarter-turn worked by hand; the links are 116 mm and 135 mm; the side view reduces to tab 1's own formula; the 3 × 5 and 6 × 5 Jacobians match finite differences, with rank 5; self-motion holds the fingertip within 0.1 mm; the Solve button's several-starts search reaches at least 99% of targets that are reachable by construction (a single search misses over 5% of them, which is why it retries); and the numbers the lessons and labels quote are recomputed from the kinematics.
 
+Eight cover the Workbench: the hand follows commands to within 1 mm with the jaws pitched down at every cube spot; pushing past the edge of reach stops the hand and tilts the jaws without breaking a joint limit; the grasp rule at its 21 mm boundary; a recording replays bit for bit, reproduces its outcome, and misses once the cube is moved 4 cm; the world advances in 1/30 s steps at 30, 60, 120 or 144 Hz; lag delays a command by exactly N steps; the toy policy trained on four demonstrations, clean or clumsy, delivers at most of eight unseen spots and beats a policy trained on one; and every number a mission quotes comes from the code that produces it.
+
 ## Under the hood
 
-- **Three files, no build.** `index.html` (Unit 2), `arm3d.js` (tab 5, fetched the first time that tab is opened) and `datasets.html` (Unit 1) are vanilla HTML, CSS and JavaScript on `<canvas>`. KaTeX (from jsDelivr) renders the Unit 2 equation cards and falls back to plain text offline.
+- **No build.** `index.html` (Unit 2), `arm3d.js` (tab 5, fetched the first time that tab is opened), `datasets.html` (Unit 1) and `workbench.html` + `workbench.js` (the Workbench) are vanilla HTML, CSS and JavaScript. KaTeX (from jsDelivr) renders the Unit 2 equation cards and falls back to plain text offline; three.js r149 is vendored for the Workbench only.
 - **Tab 5:** forward kinematics is the URDF's chain of fixed transforms and joint turns in double precision; the Jacobian is geometric (column k = axis k × (point − joint k)); IK and self-motion are damped least squares, Jᵀ(JJᵀ + λ²I)⁻¹ with λ = 6 mm/rad, steps capped at 40 mm and 0.2 rad, clamped to the URDF joint limits. That search only goes downhill from where it starts and can stall against a limit, so the Solve button retries from up to 31 other starting poses (the pan aimed at the target, then seeded random poses) before reporting a miss. The 3D picture is a hand-written orbit camera with painter's-algorithm depth sorting on a 2D canvas; it redraws only when something changes.
 - **Kinematics:** closed-form FK/IK; J(q) analytic; the damped pseudo-inverse is Jᵀ(JJᵀ + λ²I)⁻¹.
 - **Collisions:** exact segment-vs-box tests (Liang–Barsky); the configuration-space map is a 2° grid.

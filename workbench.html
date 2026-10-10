@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workbench · Arm Playground</title>
+<meta name="description" content="Drive the SO-101 robot arm in a 3D bench, record your driving as a LeRobot-style episode, replay it blind, and teach a small policy from your own demonstrations. Seven missions, a companion to the Hugging Face Robotics Course.">
+<meta property="og:title" content="Workbench: drive the SO-101, record it, replay it, teach it">
+<meta property="og:description" content="A playable 3D bench for the Hugging Face Robotics Course: teleoperate the real arm's kinematics, record a demonstration, watch a blind replay miss, and train a toy policy on your own data.">
+<meta property="og:image" content="https://bakulbadwal.github.io/arm-playground/docs/workbench.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2315171b'/%3E%3Cpath d='M14 50 L30 34 L50 16' stroke='%23f2b705' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='14' cy='50' r='5' fill='%23fff'/%3E%3Ccircle cx='30' cy='34' r='5' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* One lit workshop scene edge to edge; instrument-style panels pinned to its corners. A single daylight look by design. */
+:root {
+  color-scheme: light;
+  --ink: #1d2730; --ink-soft: #51606c; --panel: rgba(250, 249, 244, 0.94); --panel-2: rgba(240, 238, 230, 0.9); --line: rgba(29, 39, 48, 0.16);
+  --arm: #f2b705; --mat: #3d7c76; --bin: #2f6fdb; --cube: #d4472f; --ok: #23804f; --bad: #b93a26; --sky: #cfd9e2; --accent: #2f6fdb;
+  --label: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--sky); color: var(--ink); font-family: var(--label); font-size: 15px; overflow: hidden; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+#stage { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+#gl:active { cursor: grabbing; }
+.panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 6px 22px rgba(29, 39, 48, 0.14); }
+.eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-soft); }
+.eyebrow a { color: inherit; text-decoration: none; } .eyebrow a:hover { text-decoration: underline; }
+#head { top: 16px; left: 16px; width: min(440px, calc(100% - 32px)); max-height: calc(100% - 210px); overflow-y: auto; display: grid; gap: 6px; }
+#note2 { display: none; font-size: 11.5px; color: var(--ink-soft); line-height: 1.35; border-top: 1px solid var(--line); padding-top: 5px; }
+#head h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.05; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#head h1 small { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; }
+.dots { display: flex; gap: 5px; }
+.dots button { width: 22px; height: 6px; padding: 0; border-radius: 3px; background: rgba(29, 39, 48, 0.18); border: 0; }
+.dots button.done { background: var(--ok); } .dots button.cur { background: var(--ink); }
+#mTitle { font-size: 19px; font-weight: 700; line-height: 1.15; }
+#mGoal { font-size: 15px; line-height: 1.4; }
+#score { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.ask { background: var(--panel-2); border: 1px dashed var(--line); border-radius: 6px; padding: 8px 10px; display: grid; gap: 6px; }
+.ask .q { font-weight: 600; }
+.ask .opts { display: grid; gap: 5px; }
+.ask .opts button { text-align: left; font-weight: 500; }
+.ask .opts button.right { border-color: var(--ok); background: #e6f3ea; } .ask .opts button.wrong { border-color: var(--bad); background: #f7e4e0; }
+.ask input[type=number] { font: 500 14px var(--mono); width: 96px; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(29, 39, 48, 0.3); }
+.fb { font-size: 14px; line-height: 1.4; } .fb.good { color: var(--ok); } .fb.no { color: var(--bad); } .fb .why { color: var(--ink); display: block; margin-top: 3px; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: 600 14px var(--label); letter-spacing: 0.02em; color: var(--ink); background: #fff; border: 1px solid rgba(29, 39, 48, 0.3); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--bin); outline-offset: 2px; }
+button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+button.rec[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); }
+button:disabled { opacity: 0.45; cursor: default; }
+#data { top: 16px; right: 16px; width: 280px; display: grid; gap: 6px; }
+#data table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+#data th { text-align: right; font: 600 11px var(--label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); padding: 0 0 2px; }
+#data th:first-child, #data td:first-child { text-align: left; }
+#data td { padding: 1.5px 0; text-align: right; }
+#episode { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); border-top: 1px solid var(--line); padding-top: 6px; line-height: 1.5; }
+#episode b { color: var(--ink); font-weight: 500; }
+#toast { left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 17px; font-weight: 600; padding: 9px 16px; max-width: calc(100% - 32px); text-align: center; }
+#toast[data-kind="ok"] { background: var(--ok); color: #fff; border-color: transparent; }
+#toast[data-kind="bad"] { background: var(--bad); color: #fff; border-color: transparent; }
+#toast[data-kind="rec"] { background: var(--ink); color: #fff; border-color: transparent; }
+#keys { left: 16px; bottom: 16px; font-size: 13.5px; display: grid; gap: 4px; max-width: 320px; }
+kbd { font: 500 11.5px var(--mono); background: #fff; border: 1px solid rgba(29, 39, 48, 0.3); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+#note { font-size: 12px; color: var(--ink-soft); line-height: 1.35; border-top: 1px solid var(--line); padding-top: 5px; margin-top: 2px; }
+#inset { position: absolute; border: 2px solid #fff; border-radius: 4px; box-shadow: 0 6px 22px rgba(29, 39, 48, 0.3); pointer-events: none; }
+#inset span { position: absolute; left: 0; top: 0; font: 600 11px var(--label); letter-spacing: 0.08em; text-transform: uppercase; background: #fff; color: var(--ink); padding: 2px 6px; border-bottom-right-radius: 4px; }
+#touch { position: absolute; inset: 0; pointer-events: none; }
+#stick { position: absolute; left: 20px; bottom: 26px; width: 118px; height: 118px; border-radius: 50%; background: rgba(250, 249, 244, 0.72); border: 1px solid var(--line); pointer-events: auto; touch-action: none; }
+#knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: var(--ink); opacity: 0.85; }
+#tbtns { position: absolute; left: 152px; bottom: 26px; display: grid; grid-template-columns: 56px 56px; gap: 6px; pointer-events: auto; }
+#tbtns button { height: 56px; padding: 0; font-size: 14px; touch-action: none; }
+#tbtns #tgrip { grid-column: span 2; background: var(--arm); border-color: transparent; }
+#joints { position: absolute; left: 16px; bottom: 16px; display: grid; gap: 4px; pointer-events: auto; }
+#joints .jrow { display: grid; grid-template-columns: 42px 110px 42px 56px; gap: 6px; align-items: center; font-size: 13px; }
+#joints .jrow button { height: 34px; padding: 0; font-size: 16px; touch-action: none; }
+#joints .jrow output { font-family: var(--mono); font-size: 12px; text-align: right; }
+#joints .jname { display: flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--line); }
+#teach { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 6px; }
+#teachLog { font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+#teachLog b { color: var(--ink); font-weight: 500; }
+#fail { inset: 16px; display: grid; place-content: center; text-align: center; font-size: 17px; gap: 8px; max-width: 520px; margin: auto; }
+#start { position: absolute; inset: 0; display: grid; place-content: center; background: rgba(29, 39, 48, 0.28); cursor: pointer; }
+#start div { background: var(--panel); border-radius: 8px; padding: 16px 22px; font-size: 18px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.25); text-align: center; max-width: 360px; line-height: 1.35; }
+#start div small { display: block; font-weight: 500; font-size: 14px; color: var(--ink-soft); margin-top: 6px; }
+@media (max-width: 760px), (pointer: coarse) {
+  #keys { display: none; }
+  #data { top: auto; right: 16px; left: 16px; width: auto; bottom: 160px; padding: 6px 10px; }
+  #data table, #data .eyebrow { display: none; }
+  #episode { border-top: 0; padding-top: 0; }
+  #head { padding: 8px 10px; gap: 5px; max-height: 46%; }
+  #head h1 { font-size: 20px; } #mTitle { font-size: 17px; } #mGoal { font-size: 14px; }
+  #toast { bottom: auto; top: 50%; font-size: 15px; }
+  button { padding: 6px 8px; font-size: 13.5px; }
+  #joints { bottom: 200px; left: 16px; right: auto; }
+  #joints .jrow { grid-template-columns: 38px 52px 38px 0; font-size: 11px; } #joints .jrow output { display: none; }
+  #note2 { display: block; }
+}
+@media (min-width: 761px) and (pointer: fine) { #touch { display: none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" aria-label="A 3D workbench with an SO-101 robot arm, a red cube and a blue bin. Drag to look around."></canvas>
+
+  <div class="panel" id="head">
+    <div class="eyebrow"><a href="index.html#r3&step=6" title="Back to the five tabs">← Arm Playground</a> · Workbench · <span id="mUnit"></span></div>
+    <h1>Workbench <small id="mCount"></small></h1>
+    <div class="dots" id="mDots"></div>
+    <div id="mTitle"></div>
+    <div id="mGoal"></div>
+    <div id="score"></div>
+    <div id="mAsk"></div>
+    <div class="btns" id="mBtns"></div>
+    <div id="teach" hidden>
+      <div class="btns">
+        <button id="bDemo" class="rec" aria-pressed="false" title="Drive the task yourself while it records (R)">● Record a demo</button>
+        <button id="bShow" title="Let the built-in demonstrator do one and record it">Show me a demo</button>
+        <button id="bTrain" disabled title="Train the small policy on the demos recorded so far">Train</button>
+        <button id="bRun" disabled title="Put the cube on a spot the policy has never seen and let it drive (P)">Run the policy</button>
+      </div>
+      <div id="teachLog">no demonstrations yet</div>
+    </div>
+    <div id="note2">The arm's joints, lengths and limits are the SO‑101 URDF's (same code as tab 5); its shapes are simplified. Grasping and falling are toys: no contact physics. Mission 7's policy is a small network that is handed the cube's position.</div>
+    <div class="btns">
+      <button id="bPrev">← Back</button>
+      <button id="bNext" class="primary">Next mission →</button>
+      <button id="bView" aria-pressed="false" title="See through the camera on the gripper (V)">Wrist view</button>
+      <button id="bReset" title="A fresh cube for this mission">Reset cube</button>
+    </div>
+  </div>
+
+  <div class="panel" id="data">
+    <div class="eyebrow">One frame of a LeRobot episode</div>
+    <table>
+      <thead><tr><th>joint</th><th>state</th><th>action</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="episode">no episode recorded yet</div>
+  </div>
+
+  <div class="panel" id="keys">
+    <div id="keysDrive"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> move the hand · <kbd>E</kbd> up · <kbd>Q</kbd> down · <kbd>Space</kbd> grip (the jaws take a cube they close around)</div>
+    <div id="keysJoint" hidden><kbd>1</kbd>–<kbd>5</kbd> turn a joint · hold <kbd>Shift</kbd> to turn it the other way · <kbd>Space</kbd> grip</div>
+    <div><kbd>V</kbd> wrist view · <kbd>R</kbd> record · <kbd>P</kbd> replay / run · <kbd>N</kbd> next mission</div>
+    <div>Click the scene once so the keys reach it. Drag it to look around; scroll to zoom. The mat's bold lines are 100 mm apart.</div>
+    <div id="note">The arm's joints, lengths and limits are the SO‑101 URDF's, the same code as tab 5. Its shapes are simplified. Grasping and falling are toys: no contact physics. The gripper camera is this bench's own; the real SO‑101 dataset used two fixed cameras. The policy in mission 7 is a small network that is handed the cube's position.</div>
+  </div>
+
+  <div id="inset"><span id="insetLabel">wrist camera · what a policy sees</span></div>
+  <div class="panel" id="toast" hidden></div>
+
+  <div id="touch">
+    <div id="stick" aria-label="Move the hand"><div id="knob"></div></div>
+    <div id="tbtns">
+      <button id="tup" aria-label="Hand up">▲ up</button><button id="tdown" aria-label="Hand down">▼ down</button>
+      <button id="tgrip" aria-label="Close or open the gripper">GRIP</button>
+    </div>
+  </div>
+  <div class="panel" id="joints" hidden></div>
+  <div id="start" hidden><div>Click to start driving<small>W A S D move the hand · E up · Q down · Space grips</small></div></div>
+  <div class="panel" id="fail" hidden><b>This page needs WebGL, and this browser didn't start it.</b><span>The rest of Arm Playground works without it: <a href="index.html#r3&step=1">tab 5 shows the same arm in 3D</a> on a plain canvas.</span></div>
+</div>
+
+<script src="docs/vendor/three.min.js"></script>
+<script src="arm3d.js"></script>
+<script src="workbench.js"></script>
+</body>
+</html>

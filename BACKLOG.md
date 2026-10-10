@@ -2,6 +2,10 @@
 
 Ideas considered and not built, with the reason, so the same discussion doesn't happen twice. Newest first.
 
+## Decided 2026-10-10
+
+- **Workbench (plan V2): built**, all three phases, as `workbench.html` + `workbench.js` on top of `K3`. Seven missions. Record in [PLAN-3d-step-v2.md](PLAN-3d-step-v2.md). Still open from it: Follow-style continuous tracking was dropped (missions use Solve-free driving); the thinned real meshes were not attempted, the arm stays simplified shapes; three.js r149 is vendored as a plain script (608 KB, 153 KB compressed) rather than bundled.
+
 ## Decided 2026-10-05
 
 - **The real arm in 3D: built, as tab 5.** This reverses the "3-D, six-joint SO-100" rejection below, on Bakul's decision, and answers the objection in it: the tab does not replace the planar argument, it extends it. It starts as the arm of tabs 1–4 (three joints locked, the plane drawn as a sheet) and unlocks joints one at a time, so the learner sees the planar math stop being enough. Spec and what changed from it: [PLAN-3d-step.md](PLAN-3d-step.md).

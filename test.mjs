@@ -323,3 +323,80 @@ test("3D lessons and labels: the typed answers and the numbers quoted on the pag
     q.forEach((d, k) => assert.ok(d * D2R >= K3.CHAIN[k].lim[0] && d * D2R <= K3.CHAIN[k].lim[1], `"${s.t}": joint ${k} at ${d}° is inside its URDF limit`));
   for (const s of L_R3) { const f = K3.fk(s.setup.q.map((d) => d * D2R)); assert.ok(Math.min(f.P[2][2], f.P[3][2], f.P[4][2], f.T[2]) > 0, `"${s.t}" starts above z = 0`); }
 });
+
+// ---- workbench.html: the playable bench. Its core (arm control, grasp, recording, replay, lag, the toy policy) is pure, in workbench.js. ----
+const wbSrc = readFileSync(new URL("./workbench.js", import.meta.url), "utf8");
+const wStart = wbSrc.indexOf("// ================= workbench core (pure)"), wEnd = wbSrc.indexOf("// ================= end workbench core");
+assert.ok(wStart >= 0 && wEnd > wStart, "could not find the workbench core in workbench.js");
+const WB = new Function("K3", wbSrc.slice(wStart, wEnd) + "\nreturn WB;")(K3);
+const DT = 1 / WB.FPS;
+const driveTo = (w, P, speed = 180) => { for (let i = 0; i < 600; i++) { const d = K3.sub(P, w.tg), L = K3.len(d); if (L < 0.5) break; WB.step(w, { move: L <= speed * DT ? d : K3.scale(d, speed * DT / L), gripCmd: w.gripCmd }, DT); } for (let i = 0; i < 15; i++) WB.step(w, { gripCmd: w.gripCmd }, DT); };
+
+test("workbench: the hand follows commands to within 1 mm, with the jaws pitched down, at every cube spot and over the bin", () => {
+  const w = WB.world(WB.SPOTS[0]);
+  for (const P of [...WB.SPOTS.map((s) => [s[0], s[1], 21]), ...WB.SPOTS.map((s) => [s[0], s[1], 130]), [WB.BIN.c[0], WB.BIN.c[1], 84], [WB.BIN.c[0], WB.BIN.c[1], 135], WB.HOME]) {
+    driveTo(w, P); const f = K3.fk(w.q); assert.ok(dist(f.T, P) < 1, `hand ${f.T} vs ${P}`); // within 1 mm: pitch and position trade off near the edge
+    assert.ok(WB.pitchOf(f) < -60 * D2R, `jaws point down (${(WB.pitchOf(f) / D2R).toFixed(0)}°) at ${P}`);
+    w.q.forEach((v, k) => assert.ok(v >= K3.CHAIN[k].lim[0] - 1e-9 && v <= K3.CHAIN[k].lim[1] + 1e-9)); }
+});
+
+test("workbench: pushing past the edge of reach stops the hand and tilts the jaws instead of breaking a joint limit", () => {
+  const w = WB.world(WB.SPOTS[0]); for (let i = 0; i < 240; i++) WB.step(w, { move: [7, 0, 0], gripCmd: 0 }, DT); // hold "forward" for 8 seconds
+  const f = K3.fk(w.q); assert.ok(w.edge > 0, "the edge flag is up"); assert.ok(dist(w.tg, f.T) <= 20.001, "the request is held within 20 mm of the hand");
+  assert.ok(WB.pitchOf(f) > -60 * D2R, `the jaws relaxed from −75° to ${(WB.pitchOf(f) / D2R).toFixed(0)}° to reach further`);
+  w.q.forEach((v, k) => assert.ok(v >= K3.CHAIN[k].lim[0] - 1e-9 && v <= K3.CHAIN[k].lim[1] + 1e-9, "inside the URDF limits"));
+  assert.ok(f.T[0] > 380, `it got ${f.T[0].toFixed(0)} mm out along x`);
+  const T1 = f.T.slice(); for (let i = 0; i < 60; i++) WB.step(w, { move: [7, 0, 0], gripCmd: 0 }, DT); assert.ok(dist(K3.fk(w.q).T, T1) < 3, "another two seconds of pushing moves the hand under 3 mm: it has stopped");
+});
+
+test("workbench: the grasp is a toy with one rule: the closed jaws take the cube if its centre is within 21 mm of the fingertip", () => {
+  const w = WB.world(WB.SPOTS[0]), c = w.cube.p.slice();
+  driveTo(w, [c[0], c[1] + 30, 40]); for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 1 }, DT); assert.equal(w.held, false, "37 mm away: nothing");
+  for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 0 }, DT); driveTo(w, [c[0], c[1] + 23, 18]); for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 1 }, DT); assert.equal(w.held, false, "23 mm away: still nothing");
+  for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 0 }, DT); driveTo(w, [c[0], c[1] + 20, 18]); for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 1 }, DT); assert.equal(w.held, true, "20 mm away: taken");
+  for (let i = 0; i < 40; i++) WB.step(w, { gripCmd: 0 }, DT); WB.placeCube(w, [c[0], c[1]]); driveTo(w, [c[0] + 40, c[1], 21]); for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 1 }, DT); assert.equal(w.held, false, "closed early, 40 mm short");
+  driveTo(w, [c[0], c[1], 21], 60); assert.equal(w.held, true, "sliding the closed jaws onto the cube takes it (the toy's one rule)");
+  for (let i = 0; i < 40; i++) WB.step(w, { gripCmd: 0 }, DT); WB.placeCube(w, [c[0], c[1]]); driveTo(w, [c[0], c[1], 21]); for (let i = 0; i < 20; i++) WB.step(w, { gripCmd: 1 }, DT); assert.equal(w.held, true, "at the cube: taken");
+  driveTo(w, [c[0], c[1], 120]); assert.ok(WB.cubeWorld(w)[2] > 90, "the cube rides up with the hand");
+  for (let i = 0; i < 40; i++) WB.step(w, { gripCmd: 0 }, DT); assert.equal(w.held, false); assert.equal(w.cube.state, "rest"); assert.ok(close(w.cube.p[2], WB.TOP + WB.HALF, 1e-9), "let go: it falls back onto the mat");
+});
+
+test("workbench: a recording replays its own joint path exactly, reproduces the outcome, and misses once the cube is moved 4 cm", () => {
+  for (const spot of WB.SPOTS) { const ep = WB.demonstrate(spot); assert.ok(ep.frames.length > 60 && ep.end.held === false && WB.inBin(ep.end.p), `the demonstrator delivers from ${spot}`);
+    ep.frames.forEach((fr) => { assert.equal(fr.s.length, 6); assert.equal(fr.a.length, 6); });
+    { const w = WB.world(ep.cube.p, { yaw: ep.cube.yaw }), play = { x: 0, gi: 0 }; for (let i = 1; i < ep.frames.length; i++) { WB.replay(ep, w, DT, play); assert.deepEqual(w.q, ep.frames[i].a.slice(0, 5), `replay frame ${i}: the world's joints equal the recorded row, bit for bit`); } }
+    for (const [nudge, expect] of [[0, true], [40, false]]) { const w = WB.world([ep.cube.p[0], ep.cube.p[1] + nudge], { yaw: ep.cube.yaw }), play = { x: 0, gi: 0 }; let done = false;
+      for (let i = 0; i < 2000 && !done; i++) done = WB.replay(ep, w, DT, play).done;
+      assert.equal(WB.sameEnd(ep, w), expect, `nudge ${nudge} mm from ${spot}: outcome ${expect ? "matches" : "differs"}`); assert.equal(WB.inBin(w.cube.p), expect); } }
+});
+
+test("workbench: the world advances in 1/30 s steps whatever the display rate", () => {
+  for (const hz of [60, 120, 144, 30]) { let acc = 0, n = 0; for (let i = 0; i < hz * 10; i++) { const t = WB.ticks(acc, 1 / hz); acc = t.acc; n += t.n; } assert.ok(Math.abs(n - 300) <= 1, `${hz} Hz: ${n} steps in 10 s`); }
+  assert.equal(WB.ticks(0, 1 / 60).n, 0); assert.equal(WB.ticks(1 / 60, 1 / 60).n, 1); assert.equal(WB.ticks(0, 0.5).n, 7, "a long stall is capped, not replayed all at once");
+});
+
+test("workbench: with lag, a command takes effect exactly N frames later", () => {
+  for (const lag of [3, 6]) { const w = WB.world(WB.SPOTS[0], { lag }), h0 = WB.handOf(w), moved = [];
+    for (let i = 0; i < lag + 4; i++) { WB.step(w, { move: i === 0 ? [30, 0, 0] : [0, 0, 0], gripCmd: 0 }, DT); moved.push(dist(WB.handOf(w), h0)); }
+    moved.forEach((m, i) => assert.ok(i < lag ? m < 1e-9 : m > 20, `lag ${lag}: frame ${i} moved ${m.toFixed(1)} mm`)); }
+});
+
+test("workbench: mission 7's lesson holds for clean and clumsy demonstrations: four demos from different spots beat one, and deliver at most of eight unseen spots", () => {
+  const score = (p) => WB.scorePolicy(p).filter((r) => r.ok).length, fit = (eps, seed) => WB.train(WB.mlp(seed), WB.dataset(eps), { seed: seed + 2 });
+  assert.ok(WB.demonstrate(WB.SPOTS[1], { noisy: 1 }).frames.length > WB.demonstrate(WB.SPOTS[1]).frames.length, "the clumsy demonstrator pauses and dithers, so its episodes are longer");
+  for (const kind of ["clean", "noisy"]) { const demos = [0, 1, 2, 3].map((i) => (kind === "clean" ? WB.demonstrate(WB.SPOTS[i]) : WB.demonstrate(WB.SPOTS[i], { noisy: i })));
+    for (const seed of [1, 2]) { const one = score(fit([demos[0]], seed)), four = score(fit(demos, seed));
+      assert.ok(four >= 6, `${kind}, seed ${seed}: four demonstrations deliver at ${four} of 8 unseen spots`); assert.ok(four >= one, `${kind}, seed ${seed}: four (${four}) at least match one (${one})`); } }
+  const p2 = WB.train(WB.mlp(1), WB.dataset([WB.demonstrate(WB.SPOTS[0])]), { steps: 300 }); assert.deepEqual(WB.forward(p2, WB.features([200, 0, 100], [230, 90, 18], 0)).o, WB.forward(WB.train(WB.mlp(1), WB.dataset([WB.demonstrate(WB.SPOTS[0])]), { steps: 300 }), WB.features([200, 0, 100], [230, 90, 18], 0)).o, "training is deterministic for a seed");
+});
+
+test("workbench: mission answers and spots are consistent with the rest of the lab", () => {
+  const M = WB.MISSIONS; assert.equal(M.length, 7); assert.deepEqual(M.map((m) => m.id), ["pick", "joints", "far", "record", "blind", "lag", "teach"]);
+  const rec = M.find((m) => m.id === "record"); assert.equal(WB.FPS, 30); assert.equal(rec.ask.a, 180); { const w = WB.world(WB.SPOTS[0]), ep = WB.recorder(w); for (let i = 0; i < 6 * WB.FPS; i++) { const r = WB.step(w, { gripCmd: 0 }, DT); WB.record(ep, w, r.state, r.events); } assert.equal(ep.frames.length, 180, "six seconds of 1/30 s steps records 180 rows"); }
+  const lagM = M.find((m) => m.id === "lag"); assert.equal(lagM.lag * 1000 / WB.FPS, 200, "six 1/30 s frames of lag is 200 ms"); assert.ok(lagM.ask.why.includes("fifth of a second"));
+  assert.ok(M.find((m) => m.id === "pick").ask.why.includes("thirty times a second"), "mission 1 states the world's rate");
+  { const far = M.find((m) => m.id === "far"); assert.ok(far.ask.why.includes(`${K3.FACTS.L1.toFixed(0)} and ${K3.FACTS.L2.toFixed(0)} mm`) && far.ask.why.includes(`${K3.FACTS.reachOuter.toFixed(0)} mm`), "mission 3 quotes the links and the 251 mm ring");
+    const w = WB.world(WB.SPOTS[0]); for (let i = 0; i < 240; i++) WB.step(w, { move: [7, 0, 0], gripCmd: 0 }, DT); const f = K3.fk(w.q); assert.ok(dist(f.P[3], f.P[1]) > 248, "at the edge the arm is straight: wrist to shoulder is the two links' length"); w.q.forEach((v, k) => assert.ok(K3.CHAIN[k].lim[1] - Math.abs(v) > 0.1, "no joint is at its limit there")); }
+  for (const m of M) for (const s of m.spots) { const d = Math.hypot(s[0] - K3.CHAIN[0].xyz[0], s[1]); assert.ok(d < 320 && WB.demonstrate(s).end.p && WB.inBin(WB.demonstrate(s).end.p), `"${m.title}": a cube at ${s} (${d.toFixed(0)} mm out) can be delivered`); }
+  assert.ok(WB.FAR_SPOTS.every((s) => Math.hypot(s[0] - K3.CHAIN[0].xyz[0], s[1]) > 260) && WB.SPOTS.every((s) => Math.hypot(s[0] - K3.CHAIN[0].xyz[0], s[1]) < 245), "far spots are farther out than the ordinary ones");
+});
