@@ -57,7 +57,7 @@
     var allAnswered = preds.every(function (p) { return store.predicts[p.dataset.p] != null; });
     var played = (store.touched[sec] || 0) > 0;
     if (allAnswered && played) {
-      say.classList.add("on");
+      say.classList.add("open");
       if (!store.said[sec]) { store.said[sec] = true; save(); buildNav(); markNav(); }
     }
   }
@@ -74,12 +74,14 @@
   }
 
   /* ---------------- glossary tips ---------------- */
+  var tipFor = null, pinned = null;   // the term whose tip is showing; the term whose tip was opened by a tap
   function bindTip(el) {
     var g = GL[el.dataset.g]; if (!g) return;
     el.setAttribute("tabindex", "0"); el.setAttribute("role", "button");
     var tip = $("tip");
     function place() {
-      tip.innerHTML = "<b>" + g[0] + "</b>" + g[1] + '<span class="eqv">On Main Street: ' + g[2] + "</span>";
+      tipFor = el;
+      tip.innerHTML = "<b>" + g[0] + "</b>" + g[1] + '<span class="kt">On Main Street: ' + g[2] + "</span>";
       tip.style.display = "block";
       var r = el.getBoundingClientRect(), tw = Math.min(320, window.innerWidth - 24);
       tip.style.width = tw + "px";
@@ -87,14 +89,18 @@
       var top = r.bottom + 8; if (top + tip.offsetHeight > window.innerHeight - 8) top = Math.max(8, r.top - tip.offsetHeight - 8);
       tip.style.left = left + "px"; tip.style.top = top + "px";
     }
-    el.addEventListener("mouseenter", place); el.addEventListener("focus", place);
-    el.addEventListener("mouseleave", function () { tip.style.display = "none"; });
-    el.addEventListener("blur", function () { tip.style.display = "none"; });
-    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); if (tip.style.display === "block") tip.style.display = "none"; else place(); });
+    function hide() { tip.style.display = "none"; if (tipFor === el) tipFor = null; if (pinned === el) pinned = null; }
+    el.addEventListener("mouseenter", place); el.addEventListener("focus", function () { pinned = null; place(); });
+    el.addEventListener("mouseleave", function () { if (pinned !== el) hide(); });
+    el.addEventListener("blur", hide);
+    // a tap pins the tip open (hover already showed it on a desktop); a second tap closes it
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); if (pinned === el) hide(); else { pinned = el; place(); } });
+    el.addEventListener("keydown", function (e) { if (e.key === "Escape") hide(); });
   }
   function initTips(root) { qa(".g", root).forEach(bindTip); }
-  document.addEventListener("click", function () { $("tip").style.display = "none"; });
-  window.addEventListener("scroll", function () { $("tip").style.display = "none"; }, { passive: true });
+  document.addEventListener("click", function () { $("tip").style.display = "none"; pinned = null; tipFor = null; });
+  // on scroll the tip follows a keyboard-focused term (focusing an off-screen term scrolls the page); otherwise it hides
+  window.addEventListener("scroll", function () { if (tipFor && document.activeElement === tipFor) { tipFor.dispatchEvent(new Event("focus")); return; } $("tip").style.display = "none"; tipFor = null; pinned = null; }, { passive: true });
 
   /* ---------------- small widgets ---------------- */
   function seg(el, opts, val, onChange) {
@@ -152,48 +158,106 @@
   function StreetView(id, opts) {
     opts = opts || {};
     var cv = $(id), LEN = opts.len || WP.LEN, EMAX = opts.emax || 0.8;
+    // Layout: shopfronts on the top pavement, asphalt between two kerbs, a metre ruler and a legend on the bottom pavement.
     function geom(W, H) {
-      var top = H * 0.17, bot = H * 0.83, mid = (top + bot) / 2, ky = (bot - top) / 2 / (EMAX + 0.08), padL = 10, padR = 14;
-      return { W: W, H: H, top: top, bot: bot, mid: mid, ky: ky, X: function (x) { return padL + (x + 0.2) / (LEN + 0.4) * (W - padL - padR); }, Y: function (e) { return mid + e * ky; }, kx: (W - padL - padR) / (LEN + 0.4) };
+      var small = W < 560, kt = H * (small ? 0.22 : 0.27), kb = H * (small ? 0.74 : 0.77), mid = (kt + kb) / 2, ky = (kb - kt) / 2 / (EMAX + 0.08), padL = 10, padR = 14;
+      return { W: W, H: H, top: kt, bot: kb, mid: mid, ky: ky, small: small, u: Math.max(0.5, Math.min(1.15, kt / 84)),
+        X: function (x) { return padL + (x + 0.2) / (LEN + 0.4) * (W - padL - padR); }, Y: function (e) { return mid + e * ky; }, kx: (W - padL - padR) / (LEN + 0.4) };
     }
-    function shops(g, G) {
-      var cols = ["#C8452F", "#9CCBEA", "#5FA03C", "#B8A3DC", "#DDBB8A", "#F4C430"], w = 74, x = 4, i = 0;
-      [0, 1].forEach(function (row) {
-        x = 4 + row * 30; i = row * 2;
-        while (x < G.W) {
-          var y0 = row ? G.bot + G.H * 0.07 : 0, h = G.H * 0.10;
-          g.fillStyle = cols[i % cols.length]; g.fillRect(x, y0, w - 10, h); g.strokeStyle = COL.line; g.lineWidth = 1.5; g.strokeRect(x, y0, w - 10, h);
-          g.fillStyle = "#FFFDF6"; g.fillRect(x + 8, y0 + h * 0.25, 14, h * 0.45); g.fillRect(x + w - 34, y0 + h * 0.25, 14, h * 0.45);
-          x += w; i++;
-        }
-      });
+    var SHOPS = [["bakery", "#DDBB8A", "#C8452F"], ["hardware", "#5FA03C", "#F4C430"], ["café", "#9CCBEA", "#C8452F"], ["post office", "#B8A3DC", "#5FA03C"], ["paint", "#F4C430", "#9CCBEA"], ["toys", "#C8452F", "#F4C430"], ["books", "#B8A3DC", "#DDBB8A"], ["flowers", "#9CCBEA", "#5FA03C"]];
+    // A Busytown storefront in elevation, standing on the kerb line y1: roof, windows, scalloped awning, name plate, door.
+    function shopfront(g, x, y1, w, h, col, awn, name) {
+      var y0 = y1 - h, lw = h > 40 ? 1.8 : 1.3, rh = Math.max(4, h * 0.12);
+      g.lineWidth = lw; g.strokeStyle = COL.line; g.lineJoin = "round";
+      g.fillStyle = col; g.fillRect(x, y0, w, h); g.strokeRect(x, y0, w, h);
+      g.fillStyle = "#B8793F"; g.fillRect(x - 3, y0 - rh + 1, w + 6, rh); g.strokeRect(x - 3, y0 - rh + 1, w + 6, rh);
+      var wh = h * 0.2, k = Math.max(1, Math.floor(w / 28)), gap = (w - k * wh) / (k + 1), wy = y0 + h * 0.13;
+      g.fillStyle = COL.sky; for (var i = 0; i < k; i++) { var wx = x + gap + i * (wh + gap); g.fillRect(wx, wy, wh, wh); g.strokeRect(wx, wy, wh, wh); if (h > 40) { g.beginPath(); g.moveTo(wx + wh / 2, wy); g.lineTo(wx + wh / 2, wy + wh); g.stroke(); } }
+      var ay = y0 + h * 0.43, ah = h * 0.14, m = Math.max(2, Math.round(w / 11)), x0 = x - 2, ww = w + 4;
+      g.fillStyle = awn; g.beginPath(); g.moveTo(x0, ay); g.lineTo(x0 + ww, ay); g.lineTo(x0 + ww, ay + ah * 0.5);
+      for (var j = m; j > 0; j--) { g.lineTo(x0 + ww * (j - 0.5) / m, ay + ah); g.lineTo(x0 + ww * (j - 1) / m, ay + ah * 0.5); }
+      g.closePath(); g.fill(); g.stroke();
+      var dw = Math.max(6, w * 0.2), dh = h * 0.21;
+      if (h >= 34 && name) {
+        var sh = h * 0.18, sy = ay + ah + 2, sw = w - 8;
+        g.fillStyle = COL.sheet; g.fillRect(x + 4, sy, sw, sh); g.lineWidth = 1.2; g.strokeRect(x + 4, sy, sw, sh);
+        var fs = Math.round(sh * 0.78); g.fillStyle = COL.ink; g.font = "700 " + fs + "px " + SIGN; g.textAlign = "center"; g.textBaseline = "middle";
+        var nw = g.measureText(name).width; if (nw > sw - 6) { fs = Math.floor(fs * (sw - 6) / nw); g.font = "700 " + fs + "px " + SIGN; }
+        if (fs >= 8) g.fillText(name, x + w / 2, sy + sh / 2 + 0.5); g.textBaseline = "alphabetic";
+      }
+      g.lineWidth = lw; g.fillStyle = "#B8793F"; g.fillRect(x + w / 2 - dw / 2, y1 - dh, dw, dh); g.strokeRect(x + w / 2 - dw / 2, y1 - dh, dw, dh);
+      g.fillStyle = COL.line; g.beginPath(); g.arc(x + w / 2 + dw / 4, y1 - dh / 2, Math.max(0.8, h * 0.02), 0, 7); g.fill();
+    }
+    function tree(g, x, y1, u) { g.lineWidth = 1.5; g.strokeStyle = COL.line; g.fillStyle = "#B8793F"; g.fillRect(x - 2.5 * u, y1 - 18 * u, 5 * u, 18 * u); g.strokeRect(x - 2.5 * u, y1 - 18 * u, 5 * u, 18 * u); g.fillStyle = COL.grass; g.beginPath(); g.arc(x, y1 - 27 * u, 12 * u, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.arc(x - 8 * u, y1 - 20 * u, 7 * u, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.arc(x + 8 * u, y1 - 19 * u, 7 * u, 0, 7); g.fill(); g.stroke(); }
+    function lamp(g, x, y1, u) { g.lineWidth = 2.2; g.strokeStyle = COL.line; g.beginPath(); g.moveTo(x, y1); g.lineTo(x, y1 - 34 * u); g.lineTo(x + 6 * u, y1 - 34 * u); g.stroke(); g.fillStyle = "#4F6B5C"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x + 2 * u, y1 - 34 * u); g.lineTo(x + 11 * u, y1 - 34 * u); g.lineTo(x + 9.5 * u, y1 - 29 * u); g.lineTo(x + 3.5 * u, y1 - 29 * u); g.closePath(); g.fill(); g.stroke(); g.fillStyle = "#FFF1A8"; g.beginPath(); g.arc(x + 6.5 * u, y1 - 28 * u, 2 * u, 0, 7); g.fill(); g.stroke(); g.fillStyle = "#4F6B5C"; g.fillRect(x - 3 * u, y1 - 3 * u, 6 * u, 3 * u); }
+    function bench(g, x, y1, u) { g.lineWidth = 1.3; g.strokeStyle = COL.line; g.fillStyle = "#B8793F"; g.fillRect(x, y1 - 9 * u, 24 * u, 3 * u); g.strokeRect(x, y1 - 9 * u, 24 * u, 3 * u); g.fillRect(x, y1 - 14 * u, 24 * u, 2.5 * u); g.strokeRect(x, y1 - 14 * u, 24 * u, 2.5 * u); g.lineWidth = 1.8; g.beginPath(); g.moveTo(x + 3 * u, y1 - 6 * u); g.lineTo(x + 3 * u, y1); g.moveTo(x + 21 * u, y1 - 6 * u); g.lineTo(x + 21 * u, y1); g.stroke(); }
+    function hydrant(g, x, y1, u) { g.lineWidth = 1.3; g.strokeStyle = COL.line; g.fillStyle = "#C8452F"; g.beginPath(); g.roundRect(x - 3 * u, y1 - 10 * u, 6 * u, 10 * u, 1.5 * u); g.fill(); g.stroke(); g.beginPath(); g.arc(x, y1 - 10 * u, 3.4 * u, Math.PI, 0); g.fill(); g.stroke(); g.fillRect(x - 5 * u, y1 - 7 * u, 10 * u, 2.2 * u); g.strokeRect(x - 5 * u, y1 - 7 * u, 10 * u, 2.2 * u); }
+    function ducks(g, x, y1, u) {
+      g.lineWidth = 1.2; g.strokeStyle = COL.line;
+      for (var i = 0; i < 3; i++) { var dx = x + i * 8 * u; g.fillStyle = COL.paint; g.beginPath(); g.ellipse(dx, y1 - 3 * u, 3.2 * u, 2.4 * u, 0, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.arc(dx + 2.4 * u, y1 - 6 * u, 1.9 * u, 0, 7); g.fill(); g.stroke(); g.fillStyle = "#E9A23B"; g.fillRect(dx + 4 * u, y1 - 6.4 * u, 2 * u, 1 * u); }
+      var mx = x + 28 * u; g.fillStyle = COL.sheet; g.beginPath(); g.ellipse(mx, y1 - 4.5 * u, 6 * u, 4 * u, 0, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.arc(mx + 4.5 * u, y1 - 10.5 * u, 3 * u, 0, 7); g.fill(); g.stroke(); g.fillStyle = "#E9A23B"; g.fillRect(mx + 7 * u, y1 - 11.2 * u, 3.2 * u, 1.4 * u); g.fillStyle = COL.line; g.beginPath(); g.arc(mx + 5.2 * u, y1 - 11.3 * u, 0.6 * u, 0, 7); g.fill();
+    }
+    // The top pavement: a parade of shopfronts with trees, lamp posts, a bench, a hydrant and a duck family between them.
+    function parade(g, G) {
+      var u = G.u, y1 = G.top, h = Math.max(22, G.top * 0.76), ws = [64, 78, 70, 58], x = 6 * u, i = 0, slot = 0;
+      var deco = [function (x) { tree(g, x + 13 * u, y1 - 1, u); return 26 * u; }, function (x) { lamp(g, x + 6 * u, y1 - 1, u); return 18 * u; }, function (x) { bench(g, x + 3 * u, y1 - 1, u); return 30 * u; }, function (x) { tree(g, x + 13 * u, y1 - 1, u); return 26 * u; }, function (x) { hydrant(g, x + 7 * u, y1 - 1, u); return 16 * u; }];
+      g.save(); g.beginPath(); g.rect(0, 0, G.W, G.top); g.clip();
+      while (x < G.W + 10) {
+        if (slot % 3 === 2) { x += deco[Math.floor(slot / 3) % deco.length](x) + 6 * u; }
+        else { var s = SHOPS[i % SHOPS.length], w = ws[i % ws.length] * u; shopfront(g, x, y1, w, h, s[1], s[2], s[0]); if (i === 2 && w > 44) ducks(g, x + 4 * u, y1 - 0.5, u * 0.9); x += w + 10 * u; i++; }
+        slot++;
+      }
+      g.restore();
     }
     function base(g, G, w) {
+      var kt = G.Y(-EMAX), kb = G.Y(EMAX), u = G.u;
       g.fillStyle = COL.kerb; g.fillRect(0, 0, G.W, G.H);
-      shops(g, G);
-      // asphalt between the kerbs
-      g.fillStyle = COL.asphalt; g.fillRect(0, G.Y(-EMAX), G.W, G.Y(EMAX) - G.Y(-EMAX));
-      g.strokeStyle = COL.line; g.lineWidth = 2; g.beginPath(); g.moveTo(0, G.Y(-EMAX)); g.lineTo(G.W, G.Y(-EMAX)); g.moveTo(0, G.Y(EMAX)); g.lineTo(G.W, G.Y(EMAX)); g.stroke();
-      // flecks
-      g.fillStyle = "rgba(255,255,255,.09)"; for (var k = 0; k < 90; k++) { var fx = (k * 97.3) % G.W, fy = G.Y(-EMAX) + ((k * 53.1) % (G.Y(EMAX) - G.Y(-EMAX))); g.fillRect(fx, fy, 3, 1.5); }
-      // metre ruler on the kerb
-      g.fillStyle = COL.soft; g.font = "12px " + HAND; g.textAlign = "center";
-      for (var m = 0; m <= LEN; m += 2) { var px = G.X(m); g.fillRect(px - 0.5, G.Y(EMAX) + 1, 1, 5); g.fillText(m + " m", px, G.Y(EMAX) + 17); }
+      // paving slabs on both pavements
+      g.strokeStyle = "rgba(74,46,30,.12)"; g.lineWidth = 1; g.beginPath();
+      for (var sx = 18; sx < G.W; sx += 46 * u) { g.moveTo(sx, kt - 7 * u); g.lineTo(sx, kt - 1); g.moveTo(sx + 20 * u, kb + 1); g.lineTo(sx + 20 * u, G.H); }
+      g.moveTo(0, kb + 22 * u); g.lineTo(G.W, kb + 22 * u); g.stroke();
+      parade(g, G);
+      // asphalt between the kerbs, with a kerbstone edge
+      g.fillStyle = COL.asphalt; g.fillRect(0, kt, G.W, kb - kt);
+      g.fillStyle = "rgba(255,255,255,.09)"; for (var k = 0; k < 90; k++) { var fx = (k * 97.3) % G.W, fy = kt + 4 + ((k * 53.1) % (kb - kt - 8)); g.fillRect(fx, fy, 3, 1.5); }
+      g.fillStyle = "#E9E3D7"; g.fillRect(0, kt - 3, G.W, 3); g.fillRect(0, kb, G.W, 3);
+      g.strokeStyle = COL.line; g.lineWidth = 2; g.beginPath(); g.moveTo(0, kt); g.lineTo(G.W, kt); g.moveTo(0, kb); g.lineTo(G.W, kb); g.stroke();
+      g.strokeStyle = "rgba(74,46,30,.35)"; g.lineWidth = 1; g.beginPath(); for (var kx = 9; kx < G.W; kx += 18) { g.moveTo(kx, kt - 3); g.lineTo(kx, kt); g.moveTo(kx, kb); g.lineTo(kx, kb + 3); } g.stroke();
+      // metre ruler on the bottom kerb
+      var fz = G.small ? 11 : 12.5, every = G.small ? 4 : 2;
+      g.fillStyle = COL.soft; g.font = fz + "px " + HAND; g.textAlign = "center";
+      for (var m = 0; m <= LEN; m++) { var px = G.X(m), major = m % every === 0; g.fillRect(px - 0.5, kb + 3, 1, major ? 6 : 3); if (major) g.fillText(m + " m", px, kb + fz + 9); }
       // how much the view is stretched sideways, so nobody reads a 5 cm wobble as a swerve
-      g.textAlign = "right"; g.fillStyle = COL.ink; g.fillText("street straightened · sideways ×" + fmt(G.ky / G.kx, 0) + " · " + (EMAX >= 0.5 ? "kerb to kerb " + fmt(2 * EMAX, 1) + " m" : "±" + fmt(EMAX * 100, 0) + " cm shown"), G.W - 8, G.Y(-EMAX) - 5);
+      var note = "street straightened · sideways ×" + fmt(G.ky / G.kx, 0) + " · " + (EMAX >= 0.5 ? "kerb to kerb " + fmt(2 * EMAX, 1) + " m" : "±" + fmt(EMAX * 100, 0) + " cm shown");
+      g.textAlign = "right"; g.fillStyle = COL.soft; g.font = (G.small ? 10.5 : 12) + "px " + HAND;
+      g.fillText(note, G.W - 8, G.H - (G.small ? 5 : 8));
+      G.noteW = G.small ? 0 : g.measureText(note).width + 24;
       // chalk centre line
       g.strokeStyle = "rgba(255,253,246,.75)"; g.lineWidth = 1.5; g.setLineDash([8, 7]); g.beginPath(); g.moveTo(G.X(0), G.Y(0)); g.lineTo(G.X(LEN), G.Y(0)); g.stroke(); g.setLineDash([]);
     }
+    // the legend, hand-lettered on the bottom pavement; only the marks this view can show
+    function legend(g, G, items) {
+      if (G.small || !items.length) return;
+      var y = G.H - 12, x = 10, fz = 12.5, gap = 13; g.font = fz + "px " + HAND; g.textAlign = "left";
+      var widths = items.map(function (it) { return 20 + g.measureText(it[0]).width + gap; }), total = 0, n = 0;
+      for (; n < items.length && total + widths[n] <= G.W - G.noteW - 10; n++) total += widths[n];
+      for (var i = 0; i < n; i++) {
+        var it = items[i]; it[1](x + 8, y - 4); g.fillStyle = COL.soft; g.font = fz + "px " + HAND; g.textAlign = "left"; g.fillText(it[0], x + 20, y); x += widths[i];
+      }
+    }
     function cement(g, G, c) {
-      var x0 = G.X(c.x), x1 = G.X(c.x + c.len), y0 = G.Y(-c.half), y1 = G.Y(c.half);
+      var x0 = G.X(c.x), x1 = G.X(c.x + c.len), y0 = G.Y(-c.half), y1 = G.Y(c.half), u = G.u;
       g.fillStyle = COL.cement; g.fillRect(x0, y0, x1 - x0, y1 - y0);
       g.fillStyle = "rgba(74,46,30,.10)"; for (var i = 0; i < 6; i++) g.fillRect(x0 + 4 + i * (x1 - x0 - 8) / 6, y0 + 5 + (i % 2) * 6, 7, 2);
       g.strokeStyle = COL.bad; g.lineWidth = 2; g.setLineDash([5, 3]); g.strokeRect(x0 - 3, y0 - 3, x1 - x0 + 6, y1 - y0 + 6); g.setLineDash([]);
-      [[x0 - 3, y0 - 3], [x1 + 3, y0 - 3], [x0 - 3, y1 + 3], [x1 + 3, y1 + 3]].forEach(function (p) { cone(g, p[0], p[1]); });
-      g.fillStyle = COL.line; g.font = "700 12px " + SIGN; g.textAlign = "center"; g.fillText("WET", (x0 + x1) / 2, (y0 + y1) / 2 + 4);
+      [[x0 - 3, y0 - 3], [x1 + 3, y0 - 3], [x0 - 3, y1 + 3], [x1 + 3, y1 + 3]].forEach(function (p) { cone(g, p[0], p[1], u); });
+      // the WET sign on a little post
+      var sw = 30 * u, sh = 15 * u, sx = (x0 + x1) / 2 - sw / 2, sy = (y0 + y1) / 2 - sh / 2;
+      g.fillStyle = COL.sheet; g.strokeStyle = COL.line; g.lineWidth = 1.4; g.beginPath(); g.roundRect(sx, sy, sw, sh, 2); g.fill(); g.stroke();
+      g.fillStyle = COL.bad; g.font = "700 " + Math.round(10.5 * u) + "px " + SIGN; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("WET", sx + sw / 2, sy + sh / 2 + 0.5); g.textBaseline = "alphabetic";
     }
-    function cone(g, x, y) { g.fillStyle = COL.cone; g.strokeStyle = COL.line; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x, y - 7); g.lineTo(x + 5, y + 5); g.lineTo(x - 5, y + 5); g.closePath(); g.fill(); g.stroke(); g.fillStyle = "#FFFDF6"; g.fillRect(x - 2.5, y - 1, 5, 2); }
-    function pothole(g, G, x) { var px = G.X(x), py = G.Y(Math.min(0.22, EMAX * 0.55)); g.fillStyle = "#3A3A3A"; g.strokeStyle = COL.line; g.lineWidth = 1.5; g.beginPath(); g.ellipse(px, py, 9, 5, 0, 0, 7); g.fill(); g.stroke(); g.strokeStyle = "#555"; g.beginPath(); g.moveTo(px + 9, py); g.lineTo(px + 15, py - 4); g.stroke(); }
+    function cone(g, x, y, u) { u = u || 1; g.fillStyle = COL.cone; g.strokeStyle = COL.line; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x, y - 7 * u); g.lineTo(x + 5 * u, y + 5 * u); g.lineTo(x - 5 * u, y + 5 * u); g.closePath(); g.fill(); g.stroke(); g.fillStyle = "#FFFDF6"; g.fillRect(x - 2.5 * u, y - 1, 5 * u, 2); }
+    function pothole(g, G, x) { var px = G.X(x), py = G.Y(Math.min(0.22, EMAX * 0.55)), u = G.u; g.fillStyle = "#3F4246"; g.strokeStyle = COL.line; g.lineWidth = 1.5; g.beginPath(); g.ellipse(px, py, 9 * u, 5 * u, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = "#2A2C2F"; g.beginPath(); g.ellipse(px + 1, py + 1, 5 * u, 2.5 * u, 0, 0, 7); g.fill(); g.strokeStyle = "#555B60"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(px + 9 * u, py); g.lineTo(px + 14 * u, py - 3 * u); g.lineTo(px + 17 * u, py - 2 * u); g.stroke(); }
     function path(g, G, w, pts, col, width, alpha) {
       if (pts.length < 2) return;
       g.globalAlpha = alpha == null ? 1 : alpha; g.lineJoin = "round"; g.lineCap = "round";
@@ -202,15 +266,23 @@
       for (var i = 0; i < pts.length; i++) { var p = pts[i], e = p.e != null ? p.e : p.y - w.st.y(p.x), X = G.X(p.x), Y = G.Y(e); if (i) g.lineTo(X, Y); else g.moveTo(X, Y); }
       g.stroke(); g.globalAlpha = 1;
     }
+    // The striper from above: school-bus yellow body, two rear wheels and a front castor, the paint tank, the camera mast,
+    // the nozzle at the front with one drop of paint. Faces along its heading; the nozzle sits on the painted point.
     function striper(g, G, w, p) {
-      var e = p.y - w.st.y(p.x), phi = p.th - Math.atan(w.st.dy(p.x)), a = Math.atan2(Math.sin(phi) * G.ky, Math.cos(phi) * G.kx);
-      g.save(); g.translate(G.X(p.x), G.Y(e)); g.rotate(a);
-      g.fillStyle = COL.line; g.beginPath(); g.arc(-10, -9, 3.5, 0, 7); g.arc(-10, 9, 3.5, 0, 7); g.fill();
-      g.fillStyle = COL.paint; g.strokeStyle = COL.line; g.lineWidth = 2; g.beginPath(); g.roundRect(-18, -8, 26, 16, 5); g.fill(); g.stroke();
-      g.fillStyle = "#B9BDC2"; g.beginPath(); g.roundRect(-13, -5, 10, 10, 3); g.fill(); g.stroke();
-      g.fillStyle = COL.line; g.beginPath(); g.arc(4, 0, 3, 0, 7); g.fill();
+      var e = p.y - w.st.y(p.x), phi = p.th - Math.atan(w.st.dy(p.x)), a = Math.atan2(Math.sin(phi) * G.ky, Math.cos(phi) * G.kx), u = Math.max(0.62, Math.min(1, G.u));
+      g.save(); g.translate(G.X(p.x), G.Y(e)); g.rotate(a); g.scale(u, u); g.translate(-16, 0);
+      g.lineJoin = "round"; g.strokeStyle = COL.line; g.lineWidth = 1.6;
+      g.fillStyle = "#3A2A20"; g.beginPath(); g.roundRect(-14, -14, 9, 5, 2); g.roundRect(-14, 9, 9, 5, 2); g.roundRect(8, -3, 6, 6, 2); g.fill(); g.stroke();
+      g.fillStyle = COL.paint; g.lineWidth = 2; g.beginPath(); g.roundRect(-18, -10, 32, 20, 6); g.fill(); g.stroke();
+      g.strokeStyle = "#D9A514"; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-15, 7); g.lineTo(11, 7); g.stroke();
+      g.strokeStyle = COL.line; g.lineWidth = 1.5; g.fillStyle = "#B9BDC2"; g.beginPath(); g.arc(-7, 0, 6, 0, 7); g.fill(); g.stroke();
+      g.fillStyle = COL.paint; g.beginPath(); g.arc(-7, 0, 2.2, 0, 7); g.fill(); g.stroke();
+      g.fillStyle = "#B9BDC2"; g.beginPath(); g.roundRect(3, -3.5, 7, 7, 2); g.fill(); g.stroke(); g.fillStyle = COL.sky; g.beginPath(); g.arc(6.5, 0, 1.6, 0, 7); g.fill();
+      g.fillStyle = COL.line; g.beginPath(); g.roundRect(13, -2.5, 5, 5, 1.5); g.fill();
+      g.fillStyle = COL.paint; g.strokeStyle = COL.paintEdge; g.lineWidth = 1.2; g.beginPath(); g.arc(20, 0, 3, 0, 7); g.fill(); g.stroke();
       g.restore();
     }
+    function swatchLine(g, col, width) { return function (x, y) { g.strokeStyle = col; g.lineWidth = width; g.lineCap = "round"; g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x + 7, y); g.stroke(); }; }
     function render(st) {
       var c = prep(cv), g = c.g, G = geom(c.W, c.H), w = st.w;
       base(g, G, w);
@@ -219,6 +291,19 @@
       if (showCement) cement(g, G, w.cement);
       if (st.refs) st.refs.forEach(function (r) { path(g, G, w, r.pts, r.col || COL.sheet, r.width || 2, r.alpha == null ? 0.9 : r.alpha); });
       if (st.ghosts) st.ghosts.forEach(function (gh) { path(g, G, gh.w || w, gh.pts, COL.paint, 2, 0.45); });
+      // the legend: only the marks this view can show
+      var items = [];
+      if (st.trace || st.ghosts) items.push(["the striper's paint", swatchLine(g, COL.paint, 4)]);
+      if (st.refs) items.push(["the master's line", swatchLine(g, "rgba(255,253,246,.95)", 2)]);
+      if (w && w.potholes && w.potholes.length) items.push(["pothole", function (x, y) { g.fillStyle = "#3F4246"; g.strokeStyle = COL.line; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, 6, 3.5, 0, 0, 7); g.fill(); g.stroke(); }]);
+      if (st.trace && st.trace.length && st.trace[0].q) {
+        items.push(["blob = a stop", function (x, y) { g.fillStyle = COL.paint; g.strokeStyle = COL.paintEdge; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, y, 6, 4.5, 0.3, 0, 7); g.fill(); g.stroke(); }]);
+        items.push(["waypoints to drive / previewed", function (x, y) { g.strokeStyle = COL.line; g.lineWidth = 1; g.fillStyle = COL.paint; g.beginPath(); g.arc(x - 4, y, 2.6, 0, 7); g.fill(); g.stroke(); g.fillStyle = COL.sheet; g.beginPath(); g.arc(x + 4, y, 2.1, 0, 7); g.fill(); g.stroke(); }]);
+      }
+      if (st.kinks) items.push(["kink = a seam", function (x, y) { g.strokeStyle = COL.bad; g.lineWidth = 2.2; g.lineCap = "round"; g.beginPath(); g.moveTo(x - 4, y + 3); g.lineTo(x, y - 3); g.lineTo(x + 4, y + 3); g.stroke(); }]);
+      if (st.events) items.push(["a new order took over", function (x, y) { g.fillStyle = COL.line; g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - 4.5, y + 4); g.lineTo(x + 4.5, y + 4); g.closePath(); g.fill(); }]);
+      if (showCement) items.push(["tyre tracks in the cement", function (x, y) { g.fillStyle = COL.bad; g.fillRect(x - 5, y - 2, 3, 3); g.fillRect(x - 1, y - 1, 3, 3); g.fillRect(x + 3, y - 2, 3, 3); }]);
+      legend(g, G, items);
       if (st.trace) {
         var tr = st.trace, k = st.k == null ? tr.length - 1 : Math.min(st.k, tr.length - 1), moving = [], i;
         // blobs: one puddle per stop, sized by how long the nozzle stood open
@@ -233,9 +318,9 @@
         // tyre tracks in the cement
         if (showCement) { var inC = moving.filter(function (p) { return WP.inCement(w, p); }); inC.forEach(function (p) { g.fillStyle = COL.bad; g.fillRect(G.X(p.x) - 1.5, G.Y(p.y - w.st.y(p.x)) - 1.5, 3, 3); }); }
         // kinks
-        if (st.kinks) for (i = 1; i <= k; i++) if (!tr[i].stopped && !tr[i - 1].stopped && Math.abs(tr[i].om - tr[i - 1].om) > WP.KINK) { var pk = tr[i], ek = pk.y - w.st.y(pk.x), kx2 = G.X(pk.x), ky2 = G.Y(ek); g.strokeStyle = COL.bad; g.lineWidth = 2.5; g.beginPath(); g.moveTo(kx2 - 5, ky2 - 9); g.lineTo(kx2, ky2 - 15); g.lineTo(kx2 + 5, ky2 - 9); g.stroke(); }
-        // seams: where an order landed
-        if (st.events) st.events.forEach(function (ev) { if (ev.k !== "land" || ev.t > tr[k].tick) return; var px = G.X(ev.x); g.fillStyle = COL.line; g.beginPath(); g.moveTo(px, G.Y(EMAX) - 1); g.lineTo(px - 4, G.Y(EMAX) - 8); g.lineTo(px + 4, G.Y(EMAX) - 8); g.closePath(); g.fill(); });
+        if (st.kinks) { g.strokeStyle = COL.bad; g.lineWidth = 2.4; g.lineCap = "round"; g.lineJoin = "round"; for (i = 1; i <= k; i++) if (!tr[i].stopped && !tr[i - 1].stopped && Math.abs(tr[i].om - tr[i - 1].om) > WP.KINK) { var pk = tr[i], ek = pk.y - w.st.y(pk.x), kx2 = G.X(pk.x), ky2 = G.Y(ek); g.beginPath(); g.moveTo(kx2 - 4.5, ky2 - 9); g.lineTo(kx2, ky2 - 15); g.lineTo(kx2 + 4.5, ky2 - 9); g.stroke(); } }
+        // seams: where an order landed, flagged on the bottom kerb
+        if (st.events) { g.fillStyle = COL.line; st.events.forEach(function (ev) { if (ev.k !== "land" || ev.t > tr[k].tick) return; var px = G.X(ev.x), kb = G.Y(EMAX); g.beginPath(); g.moveTo(px, kb - 1); g.lineTo(px - 4, kb - 8); g.lineTo(px + 4, kb - 8); g.closePath(); g.fill(); }); }
         var cur = tr[k];
         // the queued waypoints ahead
         if (cur.q && cur.q.length) {
@@ -247,13 +332,15 @@
           }
         }
         striper(g, G, w, cur);
-        if (st.label) { g.font = "15px " + HAND; var tw = g.measureText(st.label).width + 14; g.fillStyle = "rgba(255,253,246,.94)"; g.strokeStyle = COL.line; g.lineWidth = 1.5; g.beginPath(); g.roundRect(6, 6, tw, 24, 5); g.fill(); g.stroke(); g.fillStyle = COL.ink; g.textAlign = "left"; g.fillText(st.label, 13, 23); }
+        // the run's name on a paper tag in the top-left corner of the asphalt
+        if (st.label) { var fz = G.small ? 12.5 : 14.5; g.font = fz + "px " + HAND; var tw = g.measureText(st.label).width + 14, th = fz + 10, ty = G.Y(-EMAX) + 6; g.fillStyle = "rgba(255,253,246,.94)"; g.strokeStyle = COL.line; g.lineWidth = 1.5; g.beginPath(); g.roundRect(8, ty, tw, th, 5); g.fill(); g.stroke(); g.fillStyle = COL.ink; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(st.label, 15, ty + th / 2 + 0.5); g.textBaseline = "alphabetic"; }
       }
     }
     function blob(g, G, w, p, ticks) {
-      var e = p.y - w.st.y(p.x), r = Math.min(16, 3.5 + 1.6 * Math.sqrt(ticks));
+      var e = p.y - w.st.y(p.x), r = Math.min(16, 3.5 + 1.6 * Math.sqrt(ticks)) * Math.max(0.7, Math.min(1, G.u)), X = G.X(p.x), Y = G.Y(e);
       g.fillStyle = COL.paint; g.strokeStyle = COL.paintEdge; g.lineWidth = 1.5;
-      g.beginPath(); g.ellipse(G.X(p.x), G.Y(e), r * 1.1, r * 0.9, 0.3, 0, 7); g.fill(); g.stroke();
+      g.beginPath(); g.ellipse(X, Y, r * 1.1, r * 0.9, 0.3, 0, 7); g.fill(); g.stroke();
+      if (r > 6) { g.fillStyle = "rgba(255,253,246,.45)"; g.beginPath(); g.ellipse(X - r * 0.35, Y - r * 0.3, r * 0.3, r * 0.18, 0.3, 0, 7); g.fill(); }
     }
     return { render: render };
   }
@@ -261,33 +348,46 @@
   /* ---------------- the timeline strip ---------------- */
   function drawTimeline(id, res, k, opts) {
     opts = opts || {};
-    var c = prep($(id)), g = c.g, W = c.W, H = c.H, tr = res.trace, T = Math.max(tr.length, opts.T || 0), padL = 74;
-    var X = function (t) { return padL + t / T * (W - padL - 8); }, r1 = H * 0.12, r2 = H * 0.56, rh = H * 0.32;
+    var c = prep($(id)), g = c.g, W = c.W, H = c.H, tr = res.trace, T = Math.max(tr.length, opts.T || 0), small = W < 560, fz = small ? 11.5 : 13;
     g.fillStyle = COL.sheet; g.fillRect(0, 0, W, H);
-    g.fillStyle = COL.soft; g.font = "13px " + HAND; g.textAlign = "right";
-    g.fillText("drafting desk", padL - 6, r1 + rh * 0.75); g.fillText("striper", padL - 6, r2 + rh * 0.75);
+    g.font = fz + "px " + HAND;
+    var labels = small ? ["desk", "striper"] : ["drafting desk", "striper"], padL = Math.ceil(Math.max(g.measureText(labels[0]).width, g.measureText(labels[1]).width)) + 16, padR = 10;
+    var axisH = fz + 10, top = 6, gap = 5, rh = (H - top - axisH - gap) / 2, r1 = top, r2 = top + rh + gap;
+    var X = function (t) { return padL + t / T * (W - padL - padR); };
+    g.fillStyle = "#F4EEDF"; g.fillRect(padL, r1, W - padL - padR, rh); g.fillRect(padL, r2, W - padL - padR, rh);
+    g.fillStyle = COL.soft; g.textAlign = "right"; g.textBaseline = "middle";
+    g.fillText(labels[0], padL - 8, r1 + rh / 2); g.fillText(labels[1], padL - 8, r2 + rh / 2); g.textBaseline = "alphabetic";
+    if (!tr.length) { g.textAlign = "center"; g.font = (fz + 1) + "px " + HAND; g.fillText(small ? "press Drive" : "press Drive: think-time bars on the top row, driving (green) and standing still (red) on the bottom", (padL + W - padR) / 2, r2 + rh / 2 + 4); return; }
+    // the seconds axis
+    var secs = T * WP.DT, step = secs > 40 ? 10 : secs > 16 ? 5 : secs > 8 ? 2 : 1, ay = r2 + rh;
+    g.strokeStyle = "rgba(74,46,30,.45)"; g.lineWidth = 1; g.fillStyle = COL.soft; g.textAlign = "center"; g.font = fz + "px " + HAND; g.beginPath();
+    for (var s = 0; s <= secs + 1e-9; s += step / 2) { var xs = X(s / WP.DT), major = Math.abs(s / step - Math.round(s / step)) < 1e-6; g.moveTo(xs, ay); g.lineTo(xs, ay + (major ? 5 : 2.5)); if (major) g.fillText(fmt(s, 0) + " s", xs, ay + fz + 6); }
+    g.stroke();
     // drafting: ask → land
-    var asks = [];
-    res.events.forEach(function (ev) { if (ev.k === "ask") asks.push(ev.t); if (ev.k === "land") { var t0 = ev.t0; g.fillStyle = "rgba(156,203,234,.9)"; g.strokeStyle = COL.line; g.lineWidth = 1; var x0 = X(t0), x1 = Math.max(X(ev.t), x0 + 1.5); g.fillRect(x0, r1, x1 - x0, rh); if (x1 - x0 > 3) g.strokeRect(x0, r1, x1 - x0, rh); } });
-    // driving / stopped
-    for (var i = 0; i < tr.length; i++) { g.fillStyle = tr[i].stopped ? COL.bad : COL.grass; g.fillRect(X(i), r2, Math.max(1, X(i + 1) - X(i)), rh); }
-    if (opts.queue) { g.strokeStyle = COL.ink; g.lineWidth = 1.2; g.beginPath(); for (i = 0; i < tr.length; i++) { var q = tr[i].q ? tr[i].q.length : 0, yy = r2 + rh - q / WP.H * rh; if (i) g.lineTo(X(i), yy); else g.moveTo(X(i), yy); } g.stroke(); }
-    if (k != null) { g.strokeStyle = COL.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(X(k), 2); g.lineTo(X(k), H - 2); g.stroke(); }
+    res.events.forEach(function (ev) { if (ev.k === "land") { var x0 = X(ev.t0), x1 = Math.max(X(ev.t), x0 + 1.5); g.fillStyle = "rgba(156,203,234,.9)"; g.strokeStyle = COL.line; g.lineWidth = 1; g.fillRect(x0, r1, x1 - x0, rh); if (x1 - x0 > 3) g.strokeRect(x0, r1, x1 - x0, rh); } });
+    // driving / stopped, in runs
+    for (var i = 0; i < tr.length;) { var j = i; while (j < tr.length && tr[j].stopped === tr[i].stopped) j++; g.fillStyle = tr[i].stopped ? COL.bad : COL.grass; g.fillRect(X(i), r2, Math.max(1, X(j) - X(i)), rh); i = j; }
+    g.strokeStyle = COL.line; g.lineWidth = 1; g.strokeRect(X(0), r2, X(tr.length) - X(0), rh);
+    if (opts.queue) { g.strokeStyle = COL.ink; g.lineWidth = 1.4; g.beginPath(); for (i = 0; i < tr.length; i++) { var q = tr[i].q ? tr[i].q.length : 0, yy = r2 + rh - q / WP.H * rh; if (i) g.lineTo(X(i), yy); else g.moveTo(X(i), yy); } g.stroke(); }
+    if (k != null) { g.strokeStyle = COL.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(X(k), 1); g.lineTo(X(k), ay + 4); g.stroke(); g.fillStyle = COL.ink; g.beginPath(); g.moveTo(X(k) - 4, 0); g.lineTo(X(k) + 4, 0); g.lineTo(X(k), 5); g.closePath(); g.fill(); }
   }
 
   /* ---------------- a line chart ---------------- */
   function lineChart(id, o) {
-    var c = prep($(id)), g = c.g, W = c.W, H = c.H, pad = { l: 48, r: 14, t: 16, b: 34 };
+    var c = prep($(id)), g = c.g, W = c.W, H = c.H, small = W < 560, pad = { l: small ? 42 : 52, r: 14, t: 16, b: small ? 34 : 38 }, fz = small ? 12 : 13.5;
     var xs = o.xs, xmin = o.xmin != null ? o.xmin : Math.min.apply(null, xs), xmax = o.xmax != null ? o.xmax : Math.max.apply(null, xs);
     var ymax = o.ymax || 1e-9; o.series.forEach(function (s) { s.ys.forEach(function (v) { if (v != null && v > ymax) ymax = v; }); }); ymax *= 1.08;
     var X = o.logx ? function (v) { return pad.l + (Math.log(v) - Math.log(xmin)) / (Math.log(xmax) - Math.log(xmin)) * (W - pad.l - pad.r); } : function (v) { return pad.l + (v - xmin) / (xmax - xmin || 1) * (W - pad.l - pad.r); };
     var Y = function (v) { return H - pad.b - v / ymax * (H - pad.t - pad.b); };
     g.fillStyle = COL.sheet; g.fillRect(0, 0, W, H);
-    g.strokeStyle = COL.rule; g.lineWidth = 1; g.fillStyle = COL.soft; g.font = "13px " + HAND;
-    for (var j = 0; j <= 4; j++) { var yv = ymax / 1.08 * j / 4, yy = Y(yv); g.beginPath(); g.moveTo(pad.l, yy); g.lineTo(W - pad.r, yy); g.stroke(); g.textAlign = "right"; g.fillText(fmt(yv, yv < 10 ? 1 : 0), pad.l - 6, yy + 4); }
-    g.textAlign = "center"; xs.forEach(function (v) { g.fillText(o.xfmt ? o.xfmt(v) : String(v), X(v), H - pad.b + 16); });
-    if (o.xlab) g.fillText(o.xlab, (pad.l + W - pad.r) / 2, H - 3);
-    if (o.ylab) { g.save(); g.translate(12, (pad.t + H - pad.b) / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylab, 0, 0); g.restore(); }
+    g.fillStyle = "#FBF7EC"; g.fillRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
+    g.strokeStyle = COL.rule; g.lineWidth = 1; g.fillStyle = COL.soft; g.font = fz + "px " + HAND;
+    for (var j = 0; j <= 4; j++) { var yv = ymax / 1.08 * j / 4, yy = Y(yv); g.beginPath(); g.moveTo(pad.l, yy); g.lineTo(W - pad.r, yy); g.stroke(); if (o.series.length) { g.textAlign = "right"; g.fillText(fmt(yv, yv < 10 ? 1 : 0), pad.l - 6, yy + 4); } }
+    g.strokeStyle = "rgba(74,46,30,.5)"; g.beginPath(); g.moveTo(pad.l, pad.t); g.lineTo(pad.l, H - pad.b); g.lineTo(W - pad.r, H - pad.b); g.stroke();
+    g.textAlign = "center"; xs.forEach(function (v, i) { if (small && xs.length > 6 && i % 2) return; g.fillText(o.xfmt ? o.xfmt(v) : String(v), X(v), H - pad.b + fz + 4); });
+    if (o.xlab) g.fillText(o.xlab, (pad.l + W - pad.r) / 2, H - 4);
+    if (o.ylab) { g.save(); g.translate(13, (pad.t + H - pad.b) / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylab, 0, 0); g.restore(); }
+    if (!o.series.length) { g.fillStyle = COL.soft; g.font = (fz + 2) + "px " + HAND; g.fillText(o.empty || "run the fleet to draw this chart", (pad.l + W - pad.r) / 2, (pad.t + H - pad.b) / 2 + 5); return; }
     if (o.vline != null) { g.strokeStyle = COL.grassD; g.setLineDash([4, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(o.vline), pad.t); g.lineTo(X(o.vline), H - pad.b); g.stroke(); g.setLineDash([]); if (o.vlab) { g.fillStyle = COL.grassD; g.textAlign = "left"; g.fillText(o.vlab, X(o.vline) + 4, pad.t + 10); } }
     o.series.forEach(function (s) {
       g.strokeStyle = s.col; g.lineWidth = s.width || 2.5; g.setLineDash(s.dash || []);
@@ -296,9 +396,19 @@
       g.stroke(); g.setLineDash([]);
       if (!s.noDots) s.ys.forEach(function (v, i) { if (v == null) return; g.fillStyle = s.col; g.beginPath(); g.arc(X(s.xs ? s.xs[i] : xs[i]), Y(v), 3.5, 0, 7); g.fill(); });
     });
-    // legend
-    var lx = pad.l + 8, ly = pad.t + 6; g.textAlign = "left";
-    o.series.forEach(function (s) { if (!s.name) return; g.strokeStyle = s.col; g.lineWidth = 2.5; g.setLineDash(s.dash || []); g.beginPath(); g.moveTo(lx, ly + 4); g.lineTo(lx + 20, ly + 4); g.stroke(); g.setLineDash([]); g.fillStyle = COL.ink; g.fillText(s.name, lx + 26, ly + 8); ly += 17; });
+    // legend on a paper tag in the top-left corner
+    var named = o.series.filter(function (s) { return s.name; });
+    if (named.length) {
+      g.font = fz + "px " + HAND; var lw = 0; named.forEach(function (s) { lw = Math.max(lw, g.measureText(s.name).width); });
+      var ly = pad.t + 6, lh = fz + 4, bw = lw + 40, bh = named.length * lh + 8;
+      // put the tag in whichever top corner (or the top middle) the data stays furthest from
+      var cands = [pad.l + 8, W - pad.r - bw - 8, (pad.l + W - pad.r - bw) / 2], best = 0, bestClear = -1;
+      cands.forEach(function (cx, ci) { var clear = 1e9; o.series.forEach(function (s) { s.ys.forEach(function (v, i) { if (v == null) return; var px = X(s.xs ? s.xs[i] : xs[i]); if (px >= cx - 6 && px <= cx + bw + 6) clear = Math.min(clear, Y(v) - (ly + bh)); }); }); if (clear > bestClear + 1) { bestClear = clear; best = ci; } });
+      var lx = cands[best];
+      g.fillStyle = "rgba(255,253,246,.94)"; g.strokeStyle = COL.line; g.lineWidth = 1.2; g.beginPath(); g.roundRect(lx, ly, bw, bh, 4); g.fill(); g.stroke();
+      g.textAlign = "left"; ly += 4 + lh / 2;
+      named.forEach(function (s) { g.strokeStyle = s.col; g.lineWidth = s.width || 2.5; g.setLineDash(s.dash || []); g.beginPath(); g.moveTo(lx + 8, ly); g.lineTo(lx + 28, ly); g.stroke(); g.setLineDash([]); g.fillStyle = COL.ink; g.fillText(s.name, lx + 34, ly + fz * 0.35); ly += lh; });
+    }
   }
 
   /* ---------------- the notebook map ---------------- */
@@ -387,7 +497,7 @@
         $("s0off").textContent = fmt(sc.offM, 2) + " m"; $("s0off").className = "v " + (sc.offM > 0.5 ? "bad" : "good");
         $("s0me").textContent = cm(sc.maxE); $("s0moff").textContent = fmt(msc.offM, 2) + " m · max " + cm(msc.maxE);
         $("s0pg").textContent = "≤ " + cm(farthest) + " off";
-        $("s0st").innerHTML = withHole ? "At its worst the apprentice was <b>" + cm(Math.abs(o[0])) + "</b> off the line. The five most similar pages it found were all at most <b>" + cm(farthest) + "</b> off, the very edge of where the master ever went: there's no page for where the apprentice is, so it steers as if it were nearer the line." : "On a street with no surprises the apprentice stays within <b>" + cm(sc.maxE) + "</b> of the line: every situation it meets is one the master logged.";
+        $("s0st").innerHTML = withHole ? "At its worst the apprentice was <b>" + cm(sc.maxE) + "</b> off the line. The five most similar pages it found were all at most <b>" + cm(farthest) + "</b> off, the very edge of where the master ever went: there's no page for where the apprentice is, so it steers as if it were nearer the line." : "On a street with no surprises the apprentice stays within <b>" + cm(sc.maxE) + "</b> of the line: every situation it meets is one the master logged.";
         touch("s0");
       }, 220);
     }
@@ -412,7 +522,7 @@
       $("s1in").textContent = pct(out / tr.length, 0); drawM(); touch("s1");
     };
     function drawC() {
-      if (!result) { lineChart("s1chart", { xs: FLEET_L, series: [], xlab: "street length (m)", ylab: "metres off the line" }); return; }
+      if (!result) { lineChart("s1chart", { xs: FLEET_L, series: [], xlab: "street length (m)", ylab: "metres off the line", empty: "run the 48 streets to see how off-line paint grows with the street" }); return; }
       var b8 = result.bc[1], quad = FLEET_L.map(function (L) { return b8 * (L / 8) * (L / 8); }), lin = FLEET_L.map(function (L) { return b8 * L / 8; });
       lineChart("s1chart", { xs: FLEET_L, xlab: "street length (m)", ylab: "metres off the line, mean of 12", ymax: result.bc[3] * 1.15,
         series: [{ name: "the apprentice (BC)", col: COL.bad, ys: result.bc }, { name: "the master", col: COL.grassD, ys: result.ma }, { name: "∝ length², through 8 m (never recovers)", col: COL.soft, ys: quad.map(function (v) { return v <= result.bc[3] * 1.15 ? v : null; }), dash: [5, 4], width: 1.5, noDots: true }, { name: "∝ length, through 8 m", col: COL.yellowD, ys: lin, dash: [2, 3], width: 1.5, noDots: true }] });
@@ -493,17 +603,17 @@
   function initS3() {
     var view = StreetView("s3c"), o = { d: 10, s: 25 }, running = null, last = null, rows = [];
     function label() { $("s3dv").textContent = ms(o.d); }
-    function mathbox(meas) {
-      var f = WP.idleShare(o.d, o.s);
-      $("s3m").innerHTML = '<div class="eq">idle share = d / (d + s) = ' + o.d + " / (" + o.d + " + " + o.s + ") = " + pct(f, 1) + "</div>" +
-        '<div class="eqn">Each order: stand still <b>' + o.d + "</b> ticks while it's drafted, then drive <b>" + o.s + "</b>. " + (meas != null ? "This run stood still <b>" + pct(meas, 1) + "</b> of its time." : "Press Drive to measure it.") + "</div>";
+    function mathbox(meas, ran) {   // ran: the d and s the measured run used (the sliders may have moved since)
+      var d = ran ? ran.d : o.d, s = ran ? ran.s : o.s, f = WP.idleShare(d, s);
+      $("s3m").innerHTML = '<div class="eq">idle share = d / (d + s) = ' + d + " / (" + d + " + " + s + ") = " + pct(f, 1) + "</div>" +
+        '<div class="eqn">Each order: stand still <b>' + d + "</b> ticks while it's drafted, then drive <b>" + s + "</b>. " + (meas != null ? "This run stood still <b>" + pct(meas, 1) + "</b> of its time." : "Press Drive to measure it.") + "</div>";
     }
     function idleRender() { view.render({ w: WP.testStreet(0), showAll: true }); drawTimeline("s3tl", { trace: [], events: [] }, null, { T: 1 }); }
     $("s3go").onclick = function () {
       if (running) running.stop();
       busy(["s3go"], true); $("s3st").textContent = "the drafting desk is warming up…";
       warm(function () {
-        var w = WP.testStreet(0), res = WP.execute(w, chunkNb(), { mode: "sync", delay: o.d, s: o.s, seed: 50, record: true }), sc = WP.score(w, res.trace);
+        var ran = { d: o.d, s: o.s }, w = WP.testStreet(0), res = WP.execute(w, chunkNb(), { mode: "sync", delay: ran.d, s: ran.s, seed: 50, record: true }), sc = WP.score(w, res.trace);
         last = { w: w, res: res };
         $("s3st").textContent = "";
         running = play(view, w, res, { events: res.events }, function (k) {
@@ -512,8 +622,8 @@
           hudSet("s3t", fmt(p.tick * WP.DT, 1) + " s"); hudSet("s3o", asks); hudSet("s3b", blobs); hudSet("s3idle", fmt(stops * WP.DT, 1) + " s");
           drawTimeline("s3tl", res, k);
         }, function () {
-          running = null; busy(["s3go"], false); mathbox(sc.stopS / sc.timeS);
-          $("s3st").innerHTML = "One street: <b>" + fmt(sc.timeS, 1) + " s</b>, of which <b>" + fmt(sc.stopS, 1) + " s</b> standing still in <b>" + sc.blobs + "</b> blobs. Without the think time the same street takes " + fmt(WP.score(w, WP.execute(w, chunkNb(), { mode: "sync", delay: 0, s: o.s, seed: 50 }).trace).timeS, 1) + " s.";
+          running = null; busy(["s3go"], false); mathbox(sc.stopS / sc.timeS, ran);
+          $("s3st").innerHTML = "One street, d = " + ran.d + ", s = " + ran.s + ": <b>" + fmt(sc.timeS, 1) + " s</b>, of which <b>" + fmt(sc.stopS, 1) + " s</b> standing still in <b>" + sc.blobs + "</b> blobs. Without the think time the same street takes " + fmt(WP.score(w, WP.execute(w, chunkNb(), { mode: "sync", delay: 0, s: ran.s, seed: 50 }).trace).timeS, 1) + " s.";
           touch("s3");
         });
       });
@@ -555,20 +665,27 @@
       return { k: k, v: res.trace[k].v || [] };
     }
     function drawVotes(vk) {
-      var c = prep($("s4v")), g = c.g, W = c.W, H = c.H, pad = { l: 44, r: 10, t: 12, b: 26 }, v = vk ? vk.v : [], n = v.length, half = 0.28, R = 0.65;
+      var c = prep($("s4v")), g = c.g, W = c.W, H = c.H, small = W < 560, fz = small ? 11.5 : 13, pad = { l: small ? 44 : 52, r: 12, t: 12, b: fz + 14 }, v = vk ? vk.v : [], n = v.length, half = 0.28, R = 0.65;
       var Y = function (e) { return pad.t + (e + R) / (2 * R) * (H - pad.t - pad.b); };
       g.fillStyle = COL.sheet; g.fillRect(0, 0, W, H);
-      g.fillStyle = "rgba(201,195,182,.8)"; g.fillRect(pad.l, Y(-half), W - pad.l - pad.r, Y(half) - Y(-half));
-      g.fillStyle = COL.soft; g.font = "12px " + HAND; g.textAlign = "right"; [-0.6, -0.3, 0, 0.3, 0.6].forEach(function (e) { g.fillText(fmt(e * 100, 0), pad.l - 5, Y(e) + 4); });
-      g.save(); g.translate(11, (pad.t + H - pad.b) / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("waypoint offset (cm)", 0, 0); g.restore();
-      g.textAlign = "center"; g.fillText(n ? n + " votes for this tick, oldest on the left" : "drive first", (pad.l + W) / 2, H - 6);
-      g.fillStyle = COL.bad; g.textAlign = "left"; g.fillText("cement", pad.l + 4, Y(0) + 4);
+      g.fillStyle = COL.asphalt; g.fillRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
+      g.fillStyle = COL.cement; g.fillRect(pad.l, Y(-half), W - pad.l - pad.r, Y(half) - Y(-half));
+      g.strokeStyle = COL.bad; g.lineWidth = 1.5; g.setLineDash([5, 3]); g.strokeRect(pad.l + 1, Y(-half), W - pad.l - pad.r - 2, Y(half) - Y(-half)); g.setLineDash([]);
+      g.strokeStyle = "rgba(255,253,246,.75)"; g.lineWidth = 1.5; g.setLineDash([8, 7]); g.beginPath(); g.moveTo(pad.l, Y(0)); g.lineTo(W - pad.r, Y(0)); g.stroke(); g.setLineDash([]);
+      g.fillStyle = COL.soft; g.font = fz + "px " + HAND; g.textAlign = "right"; [-0.6, -0.3, 0, 0.3, 0.6].forEach(function (e) { g.fillText(fmt(e * 100, 0), pad.l - 6, Y(e) + 4); });
+      g.save(); g.translate(13, (pad.t + H - pad.b) / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText(small ? "offset (cm)" : "waypoint offset (cm)", 0, 0); g.restore();
+      g.textAlign = "center"; g.fillText(n ? n + " votes for this tick, oldest on the left" : "press Drive, then see the votes for one tick at the cement", (pad.l + W - pad.r) / 2, H - 6);
+      g.fillStyle = COL.left; g.textAlign = "left"; g.fillText("left", pad.l + 6, pad.t + fz); g.fillStyle = COL.right; g.fillText("right", pad.l + 6, H - pad.b - 5);
+      g.fillStyle = COL.bad; g.font = "700 " + fz + "px " + SIGN; g.textAlign = "right"; g.fillText("WET", W - pad.r - 6, Y(-half) + fz + 2);
       if (!n) return;
       var num = 0, den = 0, bw = (W - pad.l - pad.r) / n;
-      v.forEach(function (a, i) { var wgt = Math.exp(-o.m * i); num += wgt * a; den += wgt; g.fillStyle = a < 0 ? COL.left : COL.right; g.globalAlpha = 0.35 + 0.65 * wgt; g.beginPath(); g.arc(pad.l + bw * (i + 0.5), Y(a), Math.max(2, Math.min(5, bw * 0.4)), 0, 7); g.fill(); });
+      g.strokeStyle = COL.line; g.lineWidth = 0.8;
+      v.forEach(function (a, i) { var wgt = Math.exp(-o.m * i); num += wgt * a; den += wgt; g.fillStyle = a < 0 ? COL.left : COL.right; g.globalAlpha = 0.35 + 0.65 * wgt; g.beginPath(); g.arc(pad.l + bw * (i + 0.5), Y(a), Math.max(2.5, Math.min(5.5, bw * 0.4)), 0, 7); g.fill(); g.stroke(); });
       g.globalAlpha = 1; var avg = num / den;
       g.strokeStyle = COL.ink; g.lineWidth = 2; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(pad.l, Y(avg)); g.lineTo(W - pad.r, Y(avg)); g.stroke(); g.setLineDash([]);
-      g.fillStyle = COL.ink; g.textAlign = "right"; g.fillText("weighted average " + fmt(avg * 100, 0) + " cm", W - pad.r - 4, Y(avg) - 5);
+      g.font = fz + "px " + HAND; var at = "dashed: the committee drives " + fmt(avg * 100, 0) + " cm", aw = g.measureText(at).width + 12, ax = W - pad.r - aw - 6, ay = pad.t + 5;
+      g.fillStyle = "rgba(255,253,246,.94)"; g.strokeStyle = COL.line; g.lineWidth = 1.2; g.beginPath(); g.roundRect(ax, ay, aw, fz + 8, 4); g.fill(); g.stroke();
+      g.fillStyle = COL.ink; g.textAlign = "left"; g.fillText(at, ax + 6, ay + fz + 1);
     }
     $("s4go").onclick = function () {
       if (running) running.stop(); busy(["s4go"], true); $("s4st").textContent = "the committee is assembling…";
@@ -649,7 +766,7 @@
       });
     };
     function drawSweep() {
-      if (!sweep) { lineChart("s5chart", { xs: GS, series: [], xlab: "threshold g", ylab: "" }); return; }
+      if (!sweep) { lineChart("s5chart", { xs: GS, xfmt: function (v) { return fmt(v, 1); }, series: [], xlab: "threshold g", ylab: "seconds stopped · flips", empty: "press Sweep g: seconds stopped and side flips at every threshold" }); return; }
       lineChart("s5chart", { xs: GS, xfmt: function (v) { return fmt(v, 1); }, xlab: "threshold g (d = " + sweep.d + ")", ylab: "seconds stopped · flips", vline: WP.gNeeded(sweep.d), vlab: "g = d/50",
         series: [{ name: "seconds stopped per street", col: COL.bad, ys: sweep.stop }, { name: "streets with a side flip, per 10", col: COL.right, ys: sweep.flips }] });
     }
@@ -674,7 +791,7 @@
       }, function () {
         state.running = null; busy([prefix + "go", prefix + "next"], false);
         hudSet(prefix + "c2", sc.cement ? fmt(sc.cementM, 2) + " m" : "no", sc.cement ? "bad" : "good");
-        $(prefix + "st").innerHTML = "Street " + (k + 1) + ": went round on the <b>" + (sc.side < 0 ? "left" : "right") + "</b> · " + sc.flips + " side flip" + (sc.flips === 1 ? "" : "s") + " · " + sc.kinks + " kink" + (sc.kinks === 1 ? "" : "s") + (sc.cement ? " · <b>tracks in the cement</b>" : "") + ". ▲ marks where each new order took over.";
+        $(prefix + "st").innerHTML = "Street " + (k + 1) + ": went round on the <b style=\"color:var(--" + (sc.side < 0 ? "left" : "right") + ")\">" + (sc.side < 0 ? "left" : "right") + "</b> · " + sc.flips + " side flip" + (sc.flips === 1 ? "" : "s") + " · " + sc.kinks + " kink" + (sc.kinks === 1 ? "" : "s") + (sc.cement ? " · <b>tracks in the cement</b>" : "") + ". ▲ marks where each new order took over.";
         touch(prefix.replace("#", ""));
       });
     });
@@ -702,19 +819,23 @@
   function initS7() {
     var view = StreetView("s7c"), o = { d: 25, how: "rtc" }, m = { d: 10, s: 25 }, state = { street: 1, running: null, last: null }, rows = {};
     function drawMask() {
-      var d = m.d, s = Math.min(WP.H - d, Math.max(m.s, d)), W = WP.rtcMask(d, s, WP.H), c = prep($("s7mask")), g = c.g, Wd = c.W, H = c.H, pad = { l: 40, r: 10, t: 14, b: 30 }, bw = (Wd - pad.l - pad.r) / WP.H;
+      var d = m.d, s = Math.min(WP.H - d, Math.max(m.s, d)), W = WP.rtcMask(d, s, WP.H), c = prep($("s7mask")), g = c.g, Wd = c.W, H = c.H, small = Wd < 560, fz = small ? 11.5 : 13, pad = { l: small ? 36 : 44, r: 10, t: fz + 16, b: fz * 2 + 14 }, bw = (Wd - pad.l - pad.r) / WP.H;
       g.fillStyle = COL.sheet; g.fillRect(0, 0, Wd, H);
       var Y = function (v) { return H - pad.b - v * (H - pad.t - pad.b); };
-      g.strokeStyle = COL.rule; g.fillStyle = COL.soft; g.font = "12px " + HAND; g.textAlign = "right";
-      [0, 0.5, 1].forEach(function (v) { g.beginPath(); g.moveTo(pad.l, Y(v)); g.lineTo(Wd - pad.r, Y(v)); g.stroke(); g.fillText(fmt(v, 1), pad.l - 5, Y(v) + 4); });
+      g.strokeStyle = COL.rule; g.lineWidth = 1; g.fillStyle = COL.soft; g.font = fz + "px " + HAND; g.textAlign = "right";
+      [0, 0.5, 1].forEach(function (v) { g.beginPath(); g.moveTo(pad.l, Y(v)); g.lineTo(Wd - pad.r, Y(v)); g.stroke(); g.fillText(fmt(v, 1), pad.l - 6, Y(v) + 4); });
       for (var i = 0; i < WP.H; i++) {
         var x = pad.l + i * bw, v = W[i];
         g.fillStyle = i < d ? COL.bad : i < WP.H - s ? COL.paint : COL.rule;
         g.fillRect(x + 1, Y(Math.max(v, 0.02)), bw - 2, H - pad.b - Y(Math.max(v, 0.02)));
         g.strokeStyle = COL.line; g.lineWidth = 1; g.strokeRect(x + 1, Y(Math.max(v, 0.02)), bw - 2, H - pad.b - Y(Math.max(v, 0.02)));
       }
-      g.fillStyle = COL.soft; g.textAlign = "center"; [0, 10, 20, 30, 40, 49].forEach(function (i) { g.fillText(String(i), pad.l + (i + 0.5) * bw, H - pad.b + 14); });
-      g.fillText("waypoint index i in the new order", (pad.l + Wd) / 2, H - 3);
+      // the three regions, named above the bars, with a bracket under each
+      var regions = [[0, d, "frozen", COL.bad], [d, WP.H - s, "soft mask", COL.yellowD], [WP.H - s, WP.H, "free", COL.soft]];
+      g.font = fz + "px " + HAND; g.textAlign = "center"; g.lineWidth = 1.2;
+      regions.forEach(function (r) { if (r[1] <= r[0]) return; var x0 = pad.l + r[0] * bw + 1, x1 = pad.l + r[1] * bw - 1, tw = g.measureText(r[2]).width; g.strokeStyle = r[3]; g.beginPath(); g.moveTo(x0, pad.t - 4); g.lineTo(x0, pad.t - 8); g.lineTo(x1, pad.t - 8); g.lineTo(x1, pad.t - 4); g.stroke(); if (x1 - x0 > tw + 6) { g.fillStyle = r[3]; g.fillText(r[2], (x0 + x1) / 2, pad.t - 12); } });
+      g.fillStyle = COL.soft; g.textAlign = "center"; [0, 10, 20, 30, 40, 49].forEach(function (i) { g.fillText(String(i), pad.l + (i + 0.5) * bw, H - pad.b + fz + 2); });
+      g.fillText("waypoint index i in the new order", (pad.l + Wd - pad.r) / 2, H - 5);
       var c1 = d < WP.H - s ? (WP.H - s - d) / (WP.H - s - d + 1) : null;
       $("s7mc").innerHTML = '<span class="sw" style="background:#A5321F"></span>frozen, i &lt; d = ' + d + ': driven from the old order before the new one lands · <span class="sw" style="background:#F4C430"></span>soft, ' + d + " ≤ i &lt; H − s = " + (WP.H - s) + ": pulled towards the old order, " + (c1 != null ? "W_" + d + " = " + fmt(W[d], 2) + " decaying to 0" : "empty at this d and s") + ' · <span class="sw" style="background:#E7DCC4"></span>free, i ≥ ' + (WP.H - s) + ": beyond the old order's 50, the new order's own" + (m.s < d ? " · s raised to d, as RTC does (s = max(d, s_min))" : m.s > WP.H - d ? " · s capped at H − d = " + (WP.H - d) + " (RTC: d ≤ s ≤ H − d)" : "");
     }
@@ -814,9 +935,9 @@
         runCase(fix.run, function (f) {
           var rows = c.checks.map(function (k) { return { ok: k.test(f), label: k.label, why: k.why(f) }; });
           rows.push({ ok: !!cause.right, label: "the cause is named", why: cause.right ? "yes" : "that's not what the re-run shows" });
-          var pass = rows.every(function (r) { return r.ok; });
+          var pass = rows.every(function (r) { return r.ok; }), fixed = rows.slice(0, -1).every(function (r) { return r.ok; });
           $(c.id + "ch").innerHTML = rows.map(function (r) { return '<div class="check ' + (r.ok ? "ok" : "no") + '"><span class="ic">' + (r.ok ? "✓" : "✗") + '</span><div>' + r.label + '<div class="why">' + r.why + "</div></div></div>"; }).join("") +
-            '<div class="callout ' + (pass ? "co-g" : "co-r") + '"><b>' + (pass ? "Fixed." : "Not fixed.") + "</b> " + esc(fix.why) + "</div>";
+            '<div class="callout ' + (pass ? "co-g" : fixed ? "co-w" : "co-r") + '"><b>' + (pass ? "Fixed." : fixed ? "Fixed, but that isn't the cause." : "Not fixed.") + "</b> " + esc(fix.why) + "</div>";
           store.cap[c.id] = store.cap[c.id] || pass; save(); grade();
         });
       };

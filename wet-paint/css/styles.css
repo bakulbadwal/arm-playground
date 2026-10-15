@@ -5,7 +5,6 @@
   --yellow:#F4C430; --brick:#C8452F; --grass:#5FA03C; --sky:#9CCBEA; --sand:#DDBB8A; --lilac:#B8A3DC; --steel:#B9BDC2; --wood:#B8793F;
   /* darker partners for text/lines on paper (≥4.5:1) */
   --brick-d:#A5321F; --grass-d:#3B7422; --sky-d:#246A9C; --yellow-d:#8A6300; --lilac-d:#5E4A94;
-  /* the square */
   /* Main Street */
   --asphalt:#8F9397; --asphalt-d:#6F7377; --kerb:#D6CFC2; --left:#246A9C; --right:#5E4A94; --cement:#C9C3B6; --cone:#E2701C; --works:#C9561A; --works-d:#9E4313;
   --sign:'Grandstander','Patrick Hand',system-ui,sans-serif;
@@ -23,7 +22,7 @@ a{color:var(--sky-d);text-underline-offset:3px}
 
 /* ---------- masthead: a painted highway guide sign ---------- */
 header{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;padding:10px 0 18px}
-.mast{display:inline-block;background:var(--works);color:var(--paper);border:var(--stroke);border-radius:10px;padding:6px 18px 8px;box-shadow:var(--lift);transform:rotate(-1.5deg)}
+.mast{display:inline-block;background:var(--works);color:var(--paper);border:var(--stroke);border-radius:10px;padding:8px 20px 10px;box-shadow:inset 0 0 0 2px rgba(255,241,222,.85),var(--lift);transform:rotate(-1.5deg)}
 .mast b{display:block;font:800 42px/1.05 var(--sign);letter-spacing:.01em;text-shadow:2px 2px 0 #7A3410}
 .mast span{display:block;font:400 17px/1.2 var(--hand);color:#FFE3CC;margin-top:2px}
 .mast .mi{display:inline-block;width:38px;height:38px;vertical-align:-7px;margin-right:6px}
@@ -67,7 +66,7 @@ section.on{display:block;animation:rise .35s cubic-bezier(.16,1,.3,1)}
 .covers b{color:var(--ink);font-weight:400;text-decoration:underline;text-decoration-color:var(--yellow);text-decoration-thickness:3px}
 .grid{display:grid;gap:12px}
 .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
-@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}.g4{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}.g4,.panel .g2{grid-template-columns:1fr 1fr}}
 .pg{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
 @media(max-width:840px){.pg{grid-template-columns:minmax(0,1fr)}}
 .panel{background:#FFF6DC;border:2px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;min-width:0}
@@ -76,7 +75,7 @@ section.on{display:block;animation:rise .35s cubic-bezier(.16,1,.3,1)}
 /* readouts: price tags hung on a nail */
 .stat{position:relative;background:var(--sheet);border:2px solid var(--line);border-radius:8px;padding:22px 8px 9px;text-align:center;min-width:0}
 .stat::before{content:"";position:absolute;top:5px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--paper);border:2px solid var(--line)}
-.stat .v{font:800 23px/1.15 var(--sign);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;color:var(--ink)}
+.stat .v{font:800 23px/1.15 var(--sign);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-wrap:balance;color:var(--ink)}
 .stat .l{font:400 14.5px/1.2 var(--hand);color:var(--soft);margin-top:2px}
 .stat.big .v{font-size:30px}
 .v.good{color:var(--grass-d)}.v.warn{color:var(--yellow-d)}.v.bad{color:var(--brick-d)}.v.gold{color:#8A5A12}.v.acc{color:var(--sky-d)}.v.left{color:var(--left)}.v.right{color:var(--right)}
@@ -144,19 +143,21 @@ input:focus,select:focus{outline:3px solid var(--sky-d);outline-offset:1px}
 
 /* ---------- the cast: a menu board ---------- */
 .kmap{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 22px;margin-top:12px;background:#FFF6DC;border:2.5px solid var(--line);border-radius:10px;padding:10px 16px}
-.kmap div{display:block;padding:7px 0;border-bottom:2px dotted rgba(74,46,30,.3);font:400 17px/1.3 var(--hand)}
+.kmap div{display:block;padding:7px 0 7px 32px;text-indent:-32px;border-bottom:2px dotted rgba(74,46,30,.3);font:400 17px/1.3 var(--hand)}
 .kmap .k{display:inline-block;width:26px;height:26px;vertical-align:-7px;margin-right:6px}
 .kmap b{font:700 18px var(--sign);color:var(--brick-d)}
-.kmap .t{display:block;color:var(--soft);font-size:15px;padding-left:32px}
+.kmap .t{display:block;color:var(--soft);font-size:15px;text-indent:0}
 .kmap br{display:none}
 
-/* ---------- charts and the square ---------- */
+/* ---------- charts and the street ---------- */
 canvas{display:block;width:100%;background:var(--sheet);border:2px solid var(--line);border-radius:8px}
-canvas.st{aspect-ratio:3.4/1;height:auto;background:var(--kerb);margin-top:10px}
-canvas.tl{aspect-ratio:12/1;height:auto;margin-top:6px}
+canvas.st{aspect-ratio:3/1;height:auto;background:var(--kerb);margin-top:12px;border-width:2.5px;border-radius:10px}
+canvas.tl{aspect-ratio:9/1;height:auto;margin-top:8px}
 canvas.mapc{aspect-ratio:1/1;height:auto;max-width:420px;background:var(--sheet)}
 canvas.chart.sm{aspect-ratio:1.8/1}
-@media(max-width:600px){canvas.st{aspect-ratio:2.4/1}canvas.tl{aspect-ratio:8/1}}
+canvas.chart.votes{aspect-ratio:3/1}
+canvas.chart.mask{aspect-ratio:2.8/1}
+@media(max-width:600px){canvas.st{aspect-ratio:2.1/1}canvas.tl{aspect-ratio:5.5/1}canvas.chart{aspect-ratio:1.6/1}canvas.chart.votes{aspect-ratio:2/1}canvas.chart.mask{aspect-ratio:1.8/1}}
 .ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 18px;align-items:end;background:var(--cream-board,#FFF6DC);border:var(--stroke);border-radius:10px;padding:10px 14px 12px;box-shadow:var(--lift)}
 .ctl .btnrow{margin:0}
 canvas.chart{aspect-ratio:2.2/1;height:auto}

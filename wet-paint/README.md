@@ -6,6 +6,10 @@
 
 ![Wet Paint: a Busytown-style Main Street, where a line-painting robot learns from a master painter with a joystick](docs/hero.png)
 
+![Step 7 mid-drive: the striper rounds the wet cement on tracing paper (Real-Time Chunking), with the shops of Main Street above and the metre ruler below](docs/drive.png)
+
+*Step 7, mid-drive: the striper takes its work orders round the wet cement on tracing paper; every blob, kink and takeover stays on the road.*
+
 A line-marking robot learns to paint the centre line of Main Street. The **striper** is the robot and its steering rule is the policy; the **master** drives it by joystick from the kerb (teleoperation) and his twenty logged runs are the demonstrations; the **apprentice's notebook** is what the learned policy looks things up in. A **pothole** is a disturbance. A **work order** of 50 waypoints is an action chunk, the **drafting desk** is inference and its think time is the latency. A **blob** is a stop with the nozzle open, a **kink** is a seam between chunks, and the **wet cement** is a fork in the demonstrations. Hold that picture and the imitation-learning and real-time-execution chapters of Hugging Face's [*Robot Learning* tutorial](https://arxiv.org/abs/2510.12403) follow.
 
 ## What's inside

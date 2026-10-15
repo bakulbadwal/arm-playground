@@ -6,7 +6,7 @@ web
 
 ## Stack
 
-Static HTML/CSS/JS, no build step, no dependencies. Hosted on GitHub Pages (https://bakulbadwal.github.io/wet-paint/). Must also work opened straight from the file.
+Static HTML/CSS/JS, no build step, no dependencies. Hosted on GitHub Pages at https://bakulbadwal.github.io/arm-playground/wet-paint/, as a folder of the Arm Playground repo. Must also work opened straight from the file.
 
 ## Users
 

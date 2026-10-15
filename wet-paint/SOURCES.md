@@ -34,6 +34,7 @@ Black et al., [*π0: A Vision-Language-Action Flow Model for General Robot Contr
 Shukor et al., [*SmolVLA: A Vision-Language-Action Model for Affordable and Efficient Robotics*](https://arxiv.org/abs/2506.01844) (2025).
 
 - 450M parameters, ~100M in the action expert; first 16 LLM layers; 10 flow-matching steps; chunks of n = 50.
+- The real-robot experiments run at "a real-world frame-rate of 30 frames per second" (Δt ≈ 33 ms), the Δt in the no-starvation condition below.
 - §3.3, Algorithm 1: send an observation when |A_t|/n < g; g = 0 is the "sequential limit", g = 1 sends every timestep; the queue never runs dry when g ≥ (E[ℓ_S]/Δt)/n. Near-duplicate observations are filtered, but an empty queue always triggers one. The overlap aggregation is not given as a formula in the paper.
 - §4.6, Fig. 5: completion time Sync 13.75 s vs Async 9.70 s on average ("∼30% faster"); in a fixed 60 s, 19 cubes placed async against 9 sync; success rates 78.3% sync, 73.3% async on average.
 - [LeRobot async docs](https://huggingface.co/docs/lerobot/async) and code (v0.6.1 `configs.py`): `chunk_size_threshold` defaults to **0.5 in code** (the docs table says 0.7; its own examples use 0.5), triggering when `qsize / action_chunk_size <= threshold`; `aggregate_fn_name` defaults to `"weighted_average"` = 0.3·old + 0.7·new, with `latest_only`, `average` (0.5/0.5) and `conservative` (0.7/0.3) as options. Actions are indexed by timestep. The module lives under `src/lerobot/async_inference` in v0.6.1.
