@@ -4,7 +4,7 @@ Ideas considered and not built, with the reason, so the same discussion doesn't 
 
 ## Decided 2026-10-15
 
-- **A companion for the material after Unit 2: built, as `wet-paint/`.** The backlog line below waited for Units 5–7, which are still unreleased; the *Robot Learning* tutorial the course distils (Capuano et al., arXiv 2510.12403, §4–5) already covers them, so the lab follows the tutorial. It is its own lab with its own world (a line-painting robot), not a tab here: it needs a different toy than the arm, and the arm's Workbench already covers recording and a small policy. Behaviour cloning, DAgger, action chunks, synchronous / ensembled / async / RTC execution. See [wet-paint/README.md](wet-paint/README.md).
+- **A companion for the material after Unit 2: built, as `demos-to-deployment/`.** The backlog line below waited for Units 5–7, which are still unreleased; the *Robot Learning* tutorial the course distils (Capuano et al., arXiv 2510.12403, §4–5) already covers them, so the lab follows the tutorial. It is its own lab with its own world (a line-painting robot), not a tab here: it needs a different toy than the arm, and the arm's Workbench already covers recording and a small policy. Behaviour cloning, DAgger, action chunks, synchronous / ensembled / async / RTC execution. See [demos-to-deployment/README.md](demos-to-deployment/README.md).
 
 ## Decided 2026-10-10
 
@@ -35,5 +35,5 @@ Ideas considered and not built, with the reason, so the same discussion doesn't 
 ## Maybe later
 
 - **Shoulder joint limit** (only the elbow is limited today). Cheap, but the map's tan/grey regions are already busy; add only if a lesson needs it.
-- ~~**A Unit 5–7 companion** once Hugging Face releases those units (RL, imitation learning, foundation models).~~ Imitation learning and real-time execution built as `wet-paint/` on 2026-10-15, from the tutorial; RL and foundation-model units still open.
+- ~~**A Unit 5–7 companion** once Hugging Face releases those units (RL, imitation learning, foundation models).~~ Imitation learning and real-time execution built as `demos-to-deployment/` on 2026-10-15, from the tutorial; RL and foundation-model units still open.
 - **Touch-friendly hover.** On phones there is no hover preview on the configuration map; tapping sets the pose. Acceptable.

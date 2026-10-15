@@ -1,4 +1,4 @@
-/* Wet Paint — the pictures. Nine hand-built 960×400 scenes of Busytown's Main Street, assembled from a small cast of
+/* Demos to Deployment — the pictures. Nine hand-built 960×400 scenes of Busytown's Main Street, assembled from a small cast of
    drawn parts (the striper, the master, the notebook, the drafting desk, the work order, the committee, the wet cement),
    plus the nav and cast icons. Flat gouache fills, one warm-brown outline, every object labelled with a hairline pointer.
    Exposed as window.WP_ART (scenes) and window.WP_ICONS (icons). */

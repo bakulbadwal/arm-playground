@@ -1,4 +1,4 @@
-/* Wet Paint — UI. Every number shown is computed by window.WP (core.js) on a seeded toy street; nothing is
+/* Demos to Deployment — UI. Every number shown is computed by window.WP (core.js) on a seeded toy street; nothing is
    hard-coded except the paper figures quoted in the prose. */
 (function () {
   "use strict";
@@ -14,7 +14,7 @@
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 
   /* ---------------- progress ---------------- */
-  var KEY = "wet-paint-v1";
+  var KEY = "demos-to-deployment-v1";
   var store = { predicts: {}, touched: {}, said: {}, cap: {}, ft: {} };
   try { var saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved) store = Object.assign(store, saved); } catch (e) {}
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }

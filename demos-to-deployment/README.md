@@ -1,10 +1,10 @@
-# Wet Paint
+# Demos to Deployment
 
 **A hands-on lab for how robots copy, drift, and keep moving while they think.** Teach a line-painting robot Main Street by demonstration, watch one pothole send it off the line, fix it by having the master ride along, then give it a slow brain and try every way of thinking while moving: stop and think, the committee, order ahead, switch on arrival, and tracing paper. Every mistake stays on the road.
 
-**Play it: https://bakulbadwal.github.io/arm-playground/wet-paint/**
+**Play it: https://bakulbadwal.github.io/arm-playground/demos-to-deployment/**
 
-![Wet Paint: a Busytown-style Main Street, where a line-painting robot learns from a master painter with a joystick](docs/hero.png)
+![Demos to Deployment: a Busytown-style Main Street, where a line-painting robot learns from a master painter with a joystick](docs/hero.png)
 
 ![Step 7 mid-drive: the striper rounds the wet cement on tracing paper (Real-Time Chunking), with the shops of Main Street above and the metre ruler below](docs/drive.png)
 
@@ -59,6 +59,6 @@ Every figure quoted from a paper is in [`SOURCES.md`](SOURCES.md) with its secti
 
 ## The series
 
-[Inference Kitchen](https://bakulbadwal.github.io/inference-kitchen/) (serving) · [Finishing School](https://bakulbadwal.github.io/finishing-school/) (post-training) · [Arm Playground](https://bakulbadwal.github.io/arm-playground/) (kinematics and control) · [Policy Pond](https://bakulbadwal.github.io/policy-pond/) (reinforcement learning) · [Fork in the Road](https://bakulbadwal.github.io/fork-in-the-road/) (diffusion policies) · [Duck's-Eye View](https://bakulbadwal.github.io/ducks-eye-view/) (robot vision) · **Wet Paint** (imitation learning and real-time execution)
+[Inference Kitchen](https://bakulbadwal.github.io/inference-kitchen/) (serving) · [Finishing School](https://bakulbadwal.github.io/finishing-school/) (post-training) · [Arm Playground](https://bakulbadwal.github.io/arm-playground/) (kinematics and control) · [Policy Pond](https://bakulbadwal.github.io/policy-pond/) (reinforcement learning) · [Fork in the Road](https://bakulbadwal.github.io/fork-in-the-road/) (diffusion policies) · [Duck's-Eye View](https://bakulbadwal.github.io/ducks-eye-view/) (robot vision) · **Demos to Deployment** (imitation learning and real-time execution)
 
 MIT licensed. Built by [Bakul Badwal](https://www.linkedin.com/in/bakulbadwal/) with Claude Code.

@@ -1,4 +1,4 @@
-/* Wet Paint — checks. `node tests/check.js` verifies the invariants and prints every number ACCEPTANCE.md quotes.
+/* Demos to Deployment — checks. `node tests/check.js` verifies the invariants and prints every number ACCEPTANCE.md quotes.
    Everything is seeded, so the printout is the same on every machine. Exits non-zero if a check fails. */
 "use strict";
 var WP = require("../js/core.js");

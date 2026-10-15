@@ -6,7 +6,7 @@ web
 
 ## Stack
 
-Static HTML/CSS/JS, no build step, no dependencies. Hosted on GitHub Pages at https://bakulbadwal.github.io/arm-playground/wet-paint/, as a folder of the Arm Playground repo. Must also work opened straight from the file.
+Static HTML/CSS/JS, no build step, no dependencies. Hosted on GitHub Pages at https://bakulbadwal.github.io/arm-playground/demos-to-deployment/, as a folder of the Arm Playground repo. Must also work opened straight from the file.
 
 ## Users
 
@@ -38,5 +38,5 @@ Used at a laptop in study sessions, and on a phone when shared. Steps are done i
 
 ## Brand commitments
 
-- Name: **Wet Paint**. A sibling of Inference Kitchen, Policy Pond and Fork in the Road: same design system, a Main Street palette and a road-works orange masthead.
+- Name: **Demos to Deployment**. A sibling of Inference Kitchen, Policy Pond and Fork in the Road: same design system, a Main Street palette and a road-works orange masthead.
 - Must not look like "every AI tool" (dark ground, neon accent, glowing cards) or like a corporate SaaS dashboard.

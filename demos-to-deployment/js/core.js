@@ -1,4 +1,4 @@
-/* Wet Paint — the math. Pure functions only, exposed as window.WP (or module.exports in Node).
+/* Demos to Deployment — the math. Pure functions only, exposed as window.WP (or module.exports in Node).
    A line-painting robot ("the striper") rolls down Main Street at a constant speed, steering to paint the
    centre line. Everything here is seeded, so every run is the same for everyone.
 
