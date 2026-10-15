@@ -6,6 +6,10 @@
 
 ![Demos to Deployment: a Busytown-style Main Street, where a line-painting robot learns from a master painter with a joystick](docs/hero.png)
 
+![Animated demo of step 7: at 500 ms of think time the striper drives the same street twice, first switching to each new work order on arrival (it zigzags, 31 kinks and 3 side flips), then on tracing paper (one smooth swing round the wet cement, 9 kinks, no flips)](docs/demo.gif)
+
+*Step 7 in motion: same street, same 500 ms delay; switch on arrival zigzags past the wet cement, tracing paper eases round it.*
+
 ![Step 7 mid-drive: the striper rounds the wet cement on tracing paper (Real-Time Chunking), with the shops of Main Street above and the metre ruler below](docs/drive.png)
 
 *Step 7, mid-drive: the striper takes its work orders round the wet cement on tracing paper; every blob, kink and takeover stays on the road.*
