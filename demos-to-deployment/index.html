@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demos to Deployment</title>
+<meta name="description" content="A hands-on lab for why a copied robot policy drifts, why big policies think in chunks, and how robots keep moving while they think: behaviour cloning, DAgger, action chunks, ACT's temporal ensembling, SmolVLA's async inference and Real-Time Chunking, on a seeded toy street.">
+<meta property="og:title" content="Demos to Deployment: how robots copy, drift, and keep moving while they think">
+<meta property="og:description" content="Teach a line-painting robot by demonstration, watch it drift after one pothole, fix it with DAgger, then give it a slow brain and try every way of thinking while moving. Every mistake stays on the road.">
+<meta property="og:image" content="https://bakulbadwal.github.io/arm-playground/demos-to-deployment/docs/hero.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='6' width='52' height='52' rx='8' fill='%238F9397' stroke='%234A2E1E' stroke-width='4'/%3E%3Cpath d='M10 40 C24 40 30 24 54 24' fill='none' stroke='%23F4C430' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='17' cy='44' r='6' fill='%23F4C430' stroke='%234A2E1E' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!--
+THESIS: Two things break a copied robot policy in the real world. Drift: behaviour cloning only saw the master on the line, so one pothole sends it somewhere its notebook has no page for (DAgger fixes it). Time: a big policy thinks slower than one control tick, so it plans in chunks, and every way of thinking while moving leaves a different mark on the road: blobs, seams, averaged plans, or (with Real-Time Chunking) none. Drawn as a Busytown Main Street where a line-painting robot learns its trade. Sibling of Inference Kitchen, Policy Pond and Fork in the Road.
+OWN-WORLD: flat gouache on paper; warm-brown outlines; asphalt, kerb and brick as whole fields; Grandstander signboards, Patrick Hand labels, Andika body; painted-sign buttons, price-tag readouts, sticky-note predictions, chalkboard takeaways.
+HONESTY: BC, DAgger, synchronous / naive-async / temporal-ensembling / SmolVLA-async / RTC execution and RTC's soft mask are the real algorithms. The street, the striper's kinematics and servo, the master's driving rule and the k-nearest-neighbour apprentice are toys, labelled as such.
+-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><filter id="gouache" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="3" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="1.3" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg>
+<div class="wrap">
+<header>
+  <div class="mast"><b><span class="mi" aria-hidden="true"></span>Demos to Deployment</b><span>a hands-on lab</span></div>
+  <div><h1>How robots copy, drift, and keep moving while they think</h1>
+  <p class="sub">A line-painting robot learns Main Street by watching a master painter. One pothole and it wanders off; a big brain and it stops to think with the nozzle open. Every mistake stays on the road. This lab walks the imitation-learning and real-time-execution chapters of Hugging Face's <em>Robot Learning</em> tutorial, ACT, SmolVLA and Real-Time Chunking, with the real algorithms on a toy street. About 75 minutes of play.</p></div>
+</header>
+
+<nav id="nav" aria-label="Steps"></nav>
+
+<!-- ============ STEP 0 ============ -->
+<section id="s0" data-title="Main Street" data-n="0">
+  <div class="card">
+    <div class="scene" data-art="s0"></div>
+    <h2>0 · Main Street: the master paints, the apprentice copies</h2>
+    <p class="lede">The town is repainting the centre line of Main Street with a robot. Nobody wants to program it, so the master painter drives it by joystick from the kerb, twenty times down twenty different streets, and every tick is logged: what the robot's camera read, and how the master steered. Those logs are the <span class="g" data-g="demo">demonstrations</span>. The robot's own steering rule, its <span class="g" data-g="policy">policy</span>, will be learned from them. Every term with a wavy red underline is tappable.</p>
+    <div class="kmap">
+      <div><span class="k" data-i="striper" aria-hidden="true"></span><b>The striper</b> = the robot<br><span class="t">its steering rule is the policy</span></div>
+      <div><span class="k" data-i="master" aria-hidden="true"></span><b>The master</b> = the human demonstrator<br><span class="t">driving by <span class="g" data-g="teleop">teleoperation</span></span></div>
+      <div><span class="k" data-i="logbook" aria-hidden="true"></span><b>The logbook</b> = the demonstrations<br><span class="t">20 runs, 50 pages a second</span></div>
+      <div><span class="k" data-i="notebook" aria-hidden="true"></span><b>The apprentice's notebook</b> = the training set<br><span class="t">what it looks things up in (<span class="g" data-g="knn">nearest neighbours</span>)</span></div>
+      <div><span class="k" data-i="pothole" aria-hidden="true"></span><b>A pothole</b> = a <span class="g" data-g="pothole">disturbance</span><br><span class="t">knocks the heading 0.2 rad (steps 0–2)</span></div>
+      <div><span class="k" data-i="order" aria-hidden="true"></span><b>A work order</b> = an <span class="g" data-g="chunk">action chunk</span><br><span class="t">50 waypoints, one per tick (step 3)</span></div>
+      <div><span class="k" data-i="clock" aria-hidden="true"></span><b>The drafting desk</b> = inference<br><span class="t">its think time is the <span class="g" data-g="latency">latency</span> (step 3)</span></div>
+      <div><span class="k" data-i="cement" aria-hidden="true"></span><b>The wet cement</b> = a fork in the demos<br><span class="t">half went left, half right (step 4)</span></div>
+      <div><span class="k" data-i="kink" aria-hidden="true"></span><b>A kink</b> = a <span class="g" data-g="seam">seam</span> between chunks<br><span class="t">a blob is a stop (steps 3–7)</span></div>
+    </div>
+    <p class="covers">Covers <b>Robot Learning tutorial §4</b>: imitation learning, behaviour cloning · <b>HF Robotics Course Unit 1</b>: recording a LeRobotDataset by teleoperation</p>
+  </div>
+
+  <div class="card">
+    <h3>Watch the master paint</h3>
+    <p class="lede">The street is drawn straightened, left to right, and stretched sideways so that centimetres show (the factor is printed in the corner of every street): the grey band is the asphalt, the dashed chalk line is the centre line, and the yellow is paint. The master's hand wobbles a little, and the logbook records that too.</p>
+    <div class="btnrow"><button class="act" id="s0demo">Log one run</button><button class="ghost" id="s0all">Log all 20</button></div>
+    <canvas id="s0c" class="st" aria-label="Main Street seen from above, with the master's painted line"></canvas>
+    <div class="grid g4">
+      <div class="stat"><div class="v" id="s0n">0</div><div class="l">runs logged</div></div>
+      <div class="stat"><div class="v" id="s0p">0</div><div class="l">pages (one per tick)</div></div>
+      <div class="stat"><div class="v good" id="s0w">–</div><div class="l">pages within 5 cm of the line</div></div>
+      <div class="stat"><div class="v" id="s0max">–</div><div class="l">furthest the master strayed</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>The apprentice takes the joystick</h3>
+    <p class="lede">The simplest way to learn from the logbook is <span class="g" data-g="bc">behaviour cloning</span>: at every tick, read the camera, find the five most similar pages in the notebook, and steer the way the master steered on them. Here the learner is a lookup, not a neural network, so you can see exactly which pages it used. A neural network trained on the same pages has no examples there either: it would fill the gap with a different guess, but it would still be a guess.</p>
+    <div class="btnrow"><button class="act" id="s0clean">Apprentice paints a clean street</button><button class="act" id="s0hole">… a street with one pothole at 4 m</button></div>
+    <canvas id="s0c2" class="st" aria-label="The apprentice's painted line, with the master's line for comparison"></canvas>
+    <div class="grid g4">
+      <div class="stat"><div class="v" id="s0off">–</div><div class="l">metres painted off the line (&gt; 5 cm)</div></div>
+      <div class="stat"><div class="v" id="s0me">–</div><div class="l">furthest off the line</div></div>
+      <div class="stat"><div class="v" id="s0moff">–</div><div class="l">the master on the same street</div></div>
+      <div class="stat"><div class="v" id="s0pg">–</div><div class="l">pages it found at its worst moment</div></div>
+    </div>
+    <div class="status" id="s0st"></div>
+    <div class="legend"><span><span class="dot" style="background:var(--yellow)"></span>the apprentice's paint</span><span><span class="dot" style="background:#FFFDF6;border:1.5px solid #4A2E1E"></span>the master's line on this street</span><span><span class="dot" style="background:#3A3A3A"></span>pothole</span></div>
+    <div class="predict" data-p="s0a">
+      <div class="tag">Guess first!</div>
+      <div class="q">On the clean street, the apprentice paints as well as the master. After the pothole at 4 m, what happens?</div>
+      <div class="opts"><button data-a="0">It wobbles for a metre and is back on the line</button><button data-a="1" data-right>It paints metres of line beside the line</button><button data-a="2">It stops</button></div>
+      <div class="why">3.80 m of its paint is more than 5 cm off; the master, kicked by the same pothole, never strays past 4.3 cm. At its worst moment, 7.9 cm off, the five pages it found were all about 3 cm off, at the very edge of what the master ever did: the notebook has no page for being nearly 8 cm off, so it steers as if it were 3.</div>
+    </div>
+    <div class="say" data-say="s0">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Behaviour cloning is supervised learning on the expert's states. It copies the master perfectly where the master went, and has nothing to copy anywhere else.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 1 ============ -->
+<section id="s1" data-title="Off the Map" data-n="1">
+  <div class="card">
+    <div class="scene" data-art="s1"></div>
+    <h2>1 · Off the map: why small mistakes compound</h2>
+    <p class="lede">The notebook is a map of situations. Plot every page by the striper's offset from the line and its heading error, and the master's twenty runs fill a tiny patch around (0, 0): a good painter is never far off. The pothole throws the apprentice out of that patch, and from then on every lookup returns the edge of the patch. That's <span class="g" data-g="covshift">covariate shift</span>: the learner's own mistakes change the questions it gets asked.</p>
+    <p class="covers">Covers <b>Robot Learning tutorial §4</b>: compounding errors in BC · Ross &amp; Bagnell (2010) via Ross, Gordon &amp; Bagnell (2011), Theorem 2.1: J(π) ≤ J(π*) + T²ε</p>
+  </div>
+  <div class="card">
+    <h3>The notebook map</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="btnrow"><button class="act" id="s1go">Draw the pothole run on the map</button></div>
+        <div class="grid g2" style="margin-top:8px">
+          <div class="stat"><div class="v" id="s1cells">–</div><div class="l">map cells with a page</div></div>
+          <div class="stat"><div class="v" id="s1in">–</div><div class="l">of the run spent outside the pages</div></div>
+        </div>
+        <div class="callout co-i">Each cell is 3.3 cm of offset by 0.033 rad of heading. The yellow cells hold the master's pages. The apprentice's run is drawn from the pothole on: every tick it stands outside the yellow patch, the nearest page is somewhere on the patch's edge.</div>
+      </div>
+      <div><canvas id="s1map" class="mapc" aria-label="The notebook map: pages by offset and heading error, with the apprentice's path"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--yellow)"></span>a page from the master's runs</span><span><span class="dot" style="background:var(--brick-d)"></span>the apprentice after the pothole</span></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Make the street longer</h3>
+    <p class="lede">Ross and Bagnell's bound for behaviour cloning: if the learner errs with probability ε per step on the expert's states, over a horizon of T steps it can make up to T²ε mistakes, because a mistake early on can cost every step after it. Run twelve streets at each length, with potholes at 0.08 per metre, and see how the off-line paint grows.</p>
+    <div class="btnrow"><button class="act" id="s1fleet">Run 12 streets at 4, 8, 16 and 32 m</button></div>
+    <canvas id="s1chart" class="chart" aria-label="Off-line paint against street length for the master and the apprentice"></canvas>
+    <div class="tablewrap"><table class="ladder" id="s1tab"></table></div>
+    <div class="status" id="s1st"></div>
+    <div class="predict" data-p="s1a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Go from 8 m streets to 32 m streets: four times the length, with potholes at the same rate. How much more off-line paint does the apprentice leave?</div>
+      <div class="opts"><button data-a="0">About 4× (proportional to length)</button><button data-a="1" data-right>About 8×: more than proportional</button><button data-a="2">About 16× (exactly T²)</button></div>
+      <div class="why">About 1.5 m to 12.1 m: 7.9×. Each pothole costs more the longer the apprentice has left to wander, so the total grows faster than the street. It's short of the full T² because a later pothole sometimes knocks it back towards the line; the bound is the worst case. The master stays at 0.00 m until 32 m.</div>
+    </div>
+    <div class="predict" data-p="s1b">
+      <div class="tag">Guess first!</div>
+      <div class="q">The master's twenty runs: what share of the pages are within 5 cm of the line?</div>
+      <div class="opts"><button data-a="0">About 60%</button><button data-a="1">About 90%</button><button data-a="2" data-right>All of them</button></div>
+      <div class="why">100.0%, and 99.4% have the heading within 0.05 rad. A good demonstrator is the problem: their data never shows a recovery, because they never needed one.</div>
+    </div>
+    <div class="say" data-say="s1">
+      <div class="tag">Say it out loud</div>
+      <div class="line">The expert's data only covers the expert's states. One mistake takes the learner off that map, where every answer is a guess from the edge, so errors compound: up to T²ε over a horizon of T.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 2 ============ -->
+<section id="s2" data-title="Ride Along" data-n="2">
+  <div class="card">
+    <div class="scene" data-art="s2"></div>
+    <h2>2 · The master rides along: DAgger</h2>
+    <p class="lede">The fix is to get pages for the places the apprentice actually goes. <span class="g" data-g="dagger">DAgger</span> does it in rounds: the apprentice drives six practice streets full of potholes (with the master grabbing the joystick back a share <span class="g" data-g="beta">β</span> of the time), the master rides along and says what he would steer at every state it reached, those pages go into the notebook, and the apprentice is refit. Round 1 was the demonstrations themselves (β₁ = 1); after that β halves each round.</p>
+    <p class="covers">Covers <b>Ross, Gordon &amp; Bagnell (2011)</b>, Algorithm 3.1: π_i = β_i·π* + (1 − β_i)·π̂_i, β_i = p^(i−1) · Theorem 3.2: cost linear in T</p>
+  </div>
+  <div class="card">
+    <h3>Ride along, round by round</h3>
+    <div class="btnrow"><button class="act" id="s2ride">Ride along one round</button><button class="ghost" id="s2more">Instead: 20 more runs from the master</button><button class="ghost" id="s2reset">Back to the 20 demonstrations ↻</button></div>
+    <div class="pg" style="margin-top:10px">
+      <div class="panel">
+        <div class="grid g2">
+          <div class="stat"><div class="v" id="s2round">1</div><div class="l">round</div></div>
+          <div class="stat"><div class="v" id="s2beta">1</div><div class="l">β this round</div></div>
+          <div class="stat"><div class="v" id="s2pages">–</div><div class="l">pages in the notebook</div></div>
+          <div class="stat"><div class="v" id="s2cells">–</div><div class="l">map cells with a page</div></div>
+        </div>
+        <div class="callout co-i">Green cells hold pages the master wrote riding along: what he would steer from where the apprentice actually was.</div>
+      </div>
+      <div><canvas id="s2map" class="mapc" aria-label="The notebook map with the ride-along pages added"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--yellow)"></span>the master's runs</span><span><span class="dot" style="background:var(--grass)"></span>pages written riding along</span><span><span class="dot" style="background:var(--brick-d)"></span>the pothole run</span></div></div>
+    </div>
+    <div class="tablewrap"><table class="ladder" id="s2tab"></table></div>
+    <canvas id="s2c" class="st" aria-label="The pothole street painted by the current apprentice"></canvas>
+    <div class="status" id="s2st"></div>
+    <div class="predict" data-p="s2a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Instead of riding along, the master logs twenty more ordinary runs: forty in all. On the pothole street, what happens?</div>
+      <div class="opts"><button data-a="0">Fixed: twice the data</button><button data-a="1" data-right>Still wanders off</button><button data-a="2">Better, but not fixed</button></div>
+      <div class="why">4.96 m off the line, at worst 24.3 cm: no better than with twenty. Twenty more runs of a master who never leaves the line are twenty more pages of being on the line. One round of riding along takes the same street to 0.00 m off, at worst 3.1 cm.</div>
+    </div>
+    <div class="predict" data-p="s2b">
+      <div class="tag">Guess first!</div>
+      <div class="q">After one round of riding along, the apprentice on the pothole street paints…</div>
+      <div class="opts"><button data-a="0">Still a few metres off</button><button data-a="1" data-right>Nothing off the line, like the master</button><button data-a="2">Worse, because the new pages are messy</button></div>
+      <div class="why">0.00 m off, at worst 3.1 cm. The pages that matter are the ones for being 5–10 cm off and pointing away, and those only exist where the apprentice went. Over twelve 16 m streets with potholes: 4.50 m off before, 0.16 m after three rounds (the review board's case 3).</div>
+    </div>
+    <div class="say" data-say="s2">
+      <div class="tag">Say it out loud</div>
+      <div class="line">More expert demonstrations don't fix drift; labels on the learner's own states do. DAgger collects them by letting the learner drive and the expert annotate, which makes the cost grow linearly in T instead of quadratically.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 3 ============ -->
+<section id="s3" data-title="The Drafting Desk" data-n="3">
+  <div class="card">
+    <div class="scene" data-art="s3"></div>
+    <h2>3 · The drafting desk: big policies think in chunks</h2>
+    <p class="lede">The apprentice now gets a big brain, the kind of <span class="g" data-g="vla">vision-language-action model</span> that reads cameras and instructions. A model that size can't answer fifty times a second, so it answers once with a <span class="g" data-g="chunk">work order</span>: 50 <span class="g" data-g="waypoint">waypoints</span>, where the nozzle should be on each of the next 50 <span class="g" data-g="tick">ticks</span>. A fixed <span class="g" data-g="servo">servo</span> steers to them. π0 and SmolVLA both predict 50 actions; ACT predicts 100, and in its ablation success rose from 1% with one action at a time to 44% with chunks of 100. The catch is time. This step pulls over to think: <span class="g" data-g="sync">synchronous inference</span>.</p>
+    <p class="covers">Covers <b>Robot Learning tutorial §4</b>: action chunking (ACT), "Optimized Inference" · <b>π0</b>: H = 50 at 50 Hz, re-plan every 25 actions · <b>RTC §4.2</b>: 76 ms model latency, d ≈ 6 ticks with the network</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Stop, think, drive</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>think time d</span><b id="s3dv">10 ticks · 200 ms</b></div><input type="range" id="s3d" min="0" max="30" step="1" value="10" aria-label="Think time in ticks"></div>
+      <div><div class="lbl">waypoints driven per order (s)</div><div class="seg" id="s3s"></div></div>
+      <div class="btnrow"><button class="act" id="s3go">Drive</button><button class="ghost" id="s3fleet">40 streets, no animation</button></div>
+    </div>
+    <canvas id="s3c" class="st" aria-label="The striper driving with work orders, stopping to think"></canvas>
+    <canvas id="s3tl" class="tl" aria-label="Timeline: thinking and driving"></canvas>
+    <div class="hud">
+      <div class="stat"><div class="v acc" id="s3t">0.0 s</div><div class="l">clock</div></div>
+      <div class="stat"><div class="v" id="s3o">–</div><div class="l">work orders</div></div>
+      <div class="stat"><div class="v warn" id="s3b">0</div><div class="l">blobs</div></div>
+      <div class="stat"><div class="v bad" id="s3idle">–</div><div class="l">time stopped</div></div>
+    </div>
+    <div class="mathbox" id="s3m"></div>
+    <div class="status" id="s3st"></div>
+    <div class="legend"><span><span class="dot" style="background:var(--yellow)"></span>waypoints to drive</span><span><span class="dot" style="background:#FFFDF6;border:1.5px solid #4A2E1E"></span>previewed by the servo, then dropped</span><span><span class="dot" style="background:var(--brick-d)"></span>stopped (timeline)</span></div>
+    <div class="predict" data-p="s3a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Think time 10 ticks (200 ms), drive 25 waypoints per order. What share of the trip is the striper standing still?</div>
+      <div class="opts"><button data-a="0">About 10%</button><button data-a="1" data-right>About 29%</button><button data-a="2">About 50%</button></div>
+      <div class="why">d/(d + s) = 10/35 = 28.6%, and the 40-street fleet measures 28.9%: 6.7 s of 23.3 s, in about 34 blobs. Halve the order to 10 waypoints and it's 50%.</div>
+    </div>
+    <div class="predict" data-p="s3b">
+      <div class="tag">Guess first!</div>
+      <div class="q">To stop less often, drive all 50 waypoints of every order. What's the cost?</div>
+      <div class="opts"><button data-a="0">None: fewer stops is just better</button><button data-a="1" data-right>The plan's far end is a second old by the time it's driven</button><button data-a="2">The servo can't follow 50</button></div>
+      <div class="why">Idle drops to 16.7% at d = 10, but the striper now drives a full second on each plan, and off-line paint goes from 0.74 m to 1.55 m: the far end of a chunk is the part predicted from the oldest information. π0 re-plans after 25 of its 50.</div>
+    </div>
+    <div class="say" data-say="s3">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Big policies predict a chunk of actions because they can't think every tick. Thinking synchronously makes the robot idle d/(d + s) of the time; driving more of each chunk stops less but reacts later.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 4 ============ -->
+<section id="s4" data-title="The Committee" data-n="4">
+  <div class="card">
+    <div class="scene" data-art="s4"></div>
+    <h2>4 · The committee: averaging overlapping chunks</h2>
+    <p class="lede">Now there's wet cement on every street, and the master went round it on the left in half his runs and on the right in the other half. A work order is a sample from those runs, so it commits to one side. ACT's way to drive smoothly is <span class="g" data-g="ensemble">temporal ensembling</span>: ask for a new order every tick, and drive, at each tick, the weighted average of every order that has a waypoint for it, weights exp(−m·i) with i = 0 the oldest and m = 0.01 (from ACT's code). Every order votes. That smooths the seams, and it is fifty orders a second, with d of them being drafted at once while each one thinks: d times the compute of a single desk.</p>
+    <p class="covers">Covers <b>ACT §IV-A</b>, Algorithm 2: "we query the policy at every timestep", w_i = exp(−m·i) · <b>LeRobot</b>: temporal ensembling requires n_action_steps = 1 · <b>RTC</b>: temporal ensembling "performs poorly across the board" in simulation and couldn't run on the robots at +100 ms</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>The committee drives</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>think time d</span><b id="s4dv">25 ticks · 500 ms</b></div><input type="range" id="s4d" min="0" max="25" step="5" value="25" aria-label="Think time in ticks"></div>
+      <div class="sl"><div class="sl-h"><span>m (larger = older votes count more)</span><b id="s4mv">0.01</b></div><input type="range" id="s4m" min="0" max="0.2" step="0.01" value="0.01" aria-label="Ensembling coefficient m"></div>
+      <div class="btnrow"><button class="act" id="s4go">Drive</button><button class="ghost" id="s4fleet">40 streets</button></div>
+    </div>
+    <canvas id="s4c" class="st" aria-label="The striper driving on averaged votes towards the cement"></canvas>
+    <canvas id="s4v" class="chart votes" aria-label="The votes for one tick at the cement, oldest first, with their weights"></canvas><div class="chartcap" id="s4vc">The votes for one tick where the master starts to swerve: each dot is one order's waypoint for that tick, blue if that order went left, purple if right, fainter the less it weighs. The dashed line is what the committee drives.</div>
+    <div class="grid g4">
+        <div class="stat"><div class="v bad" id="s4cem">–</div><div class="l">streets with tracks in the cement</div></div>
+        <div class="stat"><div class="v" id="s4flip">–</div><div class="l">streets with a side flip</div></div>
+        <div class="stat"><div class="v" id="s4q">–</div><div class="l">orders asked for per second</div></div>
+        <div class="stat"><div class="v" id="s4k">–</div><div class="l">kinks per street</div></div>
+    </div>
+    <div class="tablewrap"><table class="ladder" id="s4tab"></table></div>
+    <div class="status" id="s4st"></div>
+    <div class="predict" data-p="s4a">
+      <div class="tag">Guess first!</div>
+      <div class="q">With no think time (d = 0) the committee paints round the cement on all 40 streets. At d = 25 (500 ms), how many end up with tracks in the cement?</div>
+      <div class="opts"><button data-a="0">Still none</button><button data-a="1">A handful</button><button data-a="2" data-right>About half</button></div>
+      <div class="why">21 of 40. With half a second of lag, the votes for the swerve come from orders drafted before the striper had committed; some went left, some right, and the average of left and right is straight ahead, into the cement. It's Fork in the Road's averaging problem, now across time.</div>
+    </div>
+    <div class="say" data-say="s4">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Temporal ensembling queries every step and averages overlapping chunks. Smooth when the plans agree; at a fork it averages two good plans into a bad one, and it costs a forward pass per control tick, d of them in flight at once.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 5 ============ -->
+<section id="s5" data-title="Order Ahead" data-n="5">
+  <div class="card">
+    <div class="scene" data-art="s5"></div>
+    <h2>5 · Order ahead: asynchronous inference</h2>
+    <p class="lede">SmolVLA's answer to the blobs: never pull over. Keep driving the current order and radio for the next one while there are still waypoints in hand. The rule is one number, the threshold <span class="g" data-g="g">g</span>: send a fresh observation whenever g·50 or fewer waypoints remain. g = 0 waits for an empty queue (the paper's sequential limit, here: drive all 50, then stop); g = 1 would ask at every tick, but with one order in flight at a time it asks again the moment the last one lands, every d ticks. When the new order lands, the waypoints that overlap the old queue are merged by an <span class="g" data-g="aggregate">aggregation</span> rule; the numbers below use "keep the newest" unless you pick another. The queue never runs dry if g ≥ d/50.</p>
+    <p class="covers">Covers <b>SmolVLA §3.3</b>, Algorithm 1: |A_t|/n &lt; g, n = 50 · §4.6: async finished tasks ~30% faster (13.75 s → 9.70 s) and placed 19 cubes in 60 s against 9 · <b>LeRobot async</b>: chunk_size_threshold (0.5 in code), aggregate_fn "weighted_average" = 0.3·old + 0.7·new</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Drive and order ahead</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>think time d</span><b id="s5dv">10 ticks · 200 ms</b></div><input type="range" id="s5d" min="0" max="30" step="1" value="10" aria-label="Think time in ticks"></div>
+      <div class="sl"><div class="sl-h"><span>threshold g</span><b id="s5gv">0.5</b></div><input type="range" id="s5g" min="0" max="1" step="0.05" value="0.5" aria-label="Queue threshold g"></div>
+      <div><div class="lbl">overlap aggregation</div><div class="seg" id="s5agg"></div></div>
+      <div class="btnrow"><button class="act" id="s5go">Drive</button><button class="ghost" id="s5fleet">40 streets</button><button class="ghost" id="s5sweep">Sweep g</button></div>
+    </div>
+    <canvas id="s5c" class="st" aria-label="The striper driving while the next order is drafted"></canvas>
+    <canvas id="s5tl" class="tl" aria-label="Timeline: queue length, orders asked and landed"></canvas>
+    <div class="hud">
+      <div class="stat"><div class="v acc" id="s5t">0.0 s</div><div class="l">clock</div></div>
+      <div class="stat"><div class="v" id="s5q">–</div><div class="l">waypoints in the queue</div></div>
+      <div class="stat"><div class="v warn" id="s5b">0</div><div class="l">blobs</div></div>
+      <div class="stat"><div class="v" id="s5vs">–</div><div class="l">vs stop-and-think (s = 25)</div></div>
+    </div>
+    <canvas id="s5chart" class="chart" aria-label="Time stopped and side flips against the threshold g"></canvas>
+    <div class="status" id="s5st"></div>
+    <div class="predict" data-p="s5a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Think time 10 ticks. What is the smallest g that keeps the queue from running dry?</div>
+      <div class="opts"><button data-a="0">0.05</button><button data-a="1" data-right>0.2</button><button data-a="2">0.7</button></div>
+      <div class="why">d/n = 10/50 = 0.2: ask when 10 waypoints are left and the new order lands just as they run out. Below it the striper still stops (2.0 s a street at g = 0.1); from 0.2 on it stops only once, for the very first order. At g = 0.5 a street takes 16.8 s against 23.3 s for stop-and-think, 28% faster; that it lands near SmolVLA's ~30% is a coincidence of these settings, not a reproduction.</div>
+    </div>
+    <div class="predict" data-p="s5b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Think time 20 ticks. Go from g = 0.5 to g = 1: ask for a fresh order as often as possible. At the cement…</div>
+      <div class="opts"><button data-a="0">Better: fresher orders</button><button data-a="1" data-right>Worse: it starts changing its mind</button><button data-a="2">No difference</button></div>
+      <div class="why">27 of 40 streets flip sides at g = 0.7 and 28 at g = 1, against none at 0.5, and 19 to 24 end in the cement. Every fresh order is a fresh sample, and each one that lands replaces a plan the striper was already following. Step 6 looks at that seam.</div>
+    </div>
+    <div class="say" data-say="s5">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Async inference keeps acting while the next chunk is computed: ask when the queue falls to g·n, and it never runs dry once g ≥ latency/(Δt·n). It removes the stops; it doesn't decide how the new chunk joins the old.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 6 ============ -->
+<section id="s6" data-title="Seams" data-n="6">
+  <div class="card">
+    <div class="scene" data-art="s6"></div>
+    <h2>6 · Seams: switching to a stale plan</h2>
+    <p class="lede">The plainest way to think while moving, the RTC paper's "naive async": start drafting the next order d ticks before the current one is due to run out, and switch to it the moment it lands, dropping the waypoints whose time has passed. The new order was drafted from a camera frame d ticks old, without knowing which waypoints the striper would drive in the meantime. Where the two plans disagree there's a <span class="g" data-g="seam">seam</span>; at the cement, where they can disagree about the side, there's a <span class="g" data-g="flip">side flip</span>.</p>
+    <p class="covers">Covers <b>RTC §2</b>: inference delay d = ⌊δ/Δt⌋, execution horizon s, d ≤ s ≤ H − d · "naively switching chunks as soon as the new one is ready"</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Switch on arrival</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>think time d</span><b id="s6dv">25 ticks · 500 ms</b></div><input type="range" id="s6d" min="5" max="25" step="5" value="25" aria-label="Think time in ticks"></div>
+      <div class="btnrow"><button class="act" id="s6go">Drive</button><button class="ghost" id="s6next">Next street</button><button class="ghost" id="s6fleet">40 streets at every d</button></div>
+    </div>
+    <canvas id="s6c" class="st" aria-label="The striper switching orders on arrival, with seams marked"></canvas>
+    <div class="hud">
+      <div class="stat"><div class="v acc" id="s6t">0.0 s</div><div class="l">clock</div></div>
+      <div class="stat"><div class="v" id="s6k">0</div><div class="l">kinks</div></div>
+      <div class="stat"><div class="v warn" id="s6f">0</div><div class="l">side flips</div></div>
+      <div class="stat"><div class="v bad" id="s6c2">–</div><div class="l">in the cement</div></div>
+    </div>
+    <div class="tablewrap"><table class="ladder" id="s6tab"></table></div>
+    <div class="status" id="s6st"></div>
+    <div class="legend"><span>▲ where a new order took over</span><span><b style="color:var(--brick-d)">^</b> a kink</span><span><span class="dot" style="background:var(--brick-d)"></span>tracks in the cement</span></div>
+    <div class="predict" data-p="s6a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Naive switching, 40 streets. Up to d = 20 (400 ms) no street flips sides. At d = 25 (500 ms)?</div>
+      <div class="opts"><button data-a="0">Still none</button><button data-a="1" data-right>About two in three</button><button data-a="2">All of them</button></div>
+      <div class="why">26 of 40 flip and 19 end with tracks in the cement. At 500 ms the order drafted just before the swerve lands mid-swerve, and half the time it was a sample from the other side. Below that, the seams still grow: 0.4 kinks a street at d = 5, 5.3 at d = 20.</div>
+    </div>
+    <div class="say" data-say="s6">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Switching to a new chunk the moment it lands joins two plans that were drafted apart. The longer the delay, the bigger the seam, and at a fork the new plan can be the other mode.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 7 ============ -->
+<section id="s7" data-title="Tracing Paper" data-n="7">
+  <div class="card">
+    <div class="scene" data-art="s7"></div>
+    <h2>7 · Tracing paper: Real-Time Chunking</h2>
+    <p class="lede">Physical Intelligence's fix keeps the async timing and changes the drafting. By the time the new order lands, the first d of its waypoints will already have been driven from the old order: they are <b>frozen</b>, and the new order must continue them. The rest of the overlap is <b>soft</b>: the new order is pulled towards the old one with weights that decay to zero, so it eases from the old plan into the new instead of jumping. RTC does this by guiding a flow-matching sampler (<span class="g" data-g="inpaint">inpainting</span>), with no retraining. The notebook has no sampler to guide, so this page uses an analogue over its pages: draw the 16 most similar, shift each to continue the frozen waypoints, weight each by its agreement under the <span class="g" data-g="mask">soft mask</span>, sample one, and blend it in with the same mask. The mask is RTC's; the conditioning is a lookup-table stand-in for its guidance.</p>
+    <p class="covers">Covers <b>RTC</b> (Black, Galliker &amp; Levine 2025) eq. 5: W_i = 1 for i &lt; d; c_i(e^c_i − 1)/(e − 1), c_i = (H − s − i)/(H − s − d + 1), for d ≤ i &lt; H − s; 0 after · robust to delays "in excess of 300 milliseconds"; 20% faster than synchronous on π0.5</p>
+  </div>
+  <div class="card">
+    <h3>The soft mask</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>think time d</span><b id="s7dv">10</b></div><input type="range" id="s7d" min="0" max="25" step="1" value="10" aria-label="d"></div>
+      <div class="sl"><div class="sl-h"><span>driven per order s</span><b id="s7sv">25</b></div><input type="range" id="s7s" min="5" max="45" step="1" value="25" aria-label="s"></div>
+    </div>
+    <canvas id="s7mask" class="chart mask" aria-label="RTC's soft mask over the 50 waypoints of the new order"></canvas>
+    <div class="chartcap" id="s7mc"></div>
+  </div>
+  <div class="card" data-shot>
+    <h3>Naive or tracing paper, same street, same delay</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>think time d</span><b id="s7ddv">25 ticks · 500 ms</b></div><input type="range" id="s7dd" min="5" max="25" step="5" value="25" aria-label="Think time in ticks"></div>
+      <div><div class="lbl">how the new order joins</div><div class="seg" id="s7how"></div></div>
+      <div class="btnrow"><button class="act" id="s7go">Drive</button><button class="ghost" id="s7next">Next street</button><button class="ghost" id="s7fleet">40 streets, both ways, every d</button></div>
+    </div>
+    <canvas id="s7c" class="st" aria-label="The striper with Real-Time Chunking or naive switching"></canvas>
+    <div class="hud">
+      <div class="stat"><div class="v acc" id="s7t">0.0 s</div><div class="l">clock</div></div>
+      <div class="stat"><div class="v" id="s7k">0</div><div class="l">kinks</div></div>
+      <div class="stat"><div class="v warn" id="s7f">0</div><div class="l">side flips</div></div>
+      <div class="stat"><div class="v bad" id="s7c2">–</div><div class="l">in the cement</div></div>
+    </div>
+    <div class="tablewrap"><table class="ladder" id="s7tab"></table></div>
+    <div class="status" id="s7st"></div>
+    <h3>What it doesn't fix: reacting to something new</h3>
+    <p class="lede">Pour the cement late, 1.6 m ahead of the striper, and measure how far it <span class="g" data-g="blind">drives blind</span>: metres on orders drafted before the pour. Frozen waypoints are, by design, not up for revision.</p>
+    <div class="btnrow"><button class="ghost" id="s7blind">Measure blind metres, 40 streets, d = 10</button></div>
+    <div class="tablewrap"><table class="ladder" id="s7btab"></table></div>
+    <div class="predict" data-p="s7a">
+      <div class="tag">Guess first!</div>
+      <div class="q">d = 25 (500 ms), 40 streets. Naive switching flipped sides on 26. With tracing paper?</div>
+      <div class="opts"><button data-a="0">About the same</button><button data-a="1">About half as many</button><button data-a="2" data-right>One</button></div>
+      <div class="why">1 of 40, and 2 with tracks in the cement against 19; kinks drop from 29.3 a street to 7.5. The frozen waypoints carry the side the striper has committed to, and pages from that side continue them best. It isn't free: at short delays the tracing-paper striper paints a little more off the line than plain switching (the table's last column), because it keeps leaning on an older plan.</div>
+    </div>
+    <div class="predict" data-p="s7b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Cement poured 1.6 m ahead, d = 10. Which drives blind the shortest distance?</div>
+      <div class="opts"><button data-a="0">Tracing paper, s = 25</button><button data-a="1" data-right>Stop-and-think with short orders (s = 10)</button><button data-a="2">Naive switching, s = 25</button></div>
+      <div class="why">Stop-and-think with s = 10: 0.07 m, because it looks again every 10 waypoints, but it stands still 16.7 s per street. Tracing paper with s = 25 drives 0.63 m blind; with s = 10 it's 0.27 m while stopping only for its first order. How far it drives blind is set by s and d, not by how the orders are joined; but what it does next isn't. Tracing paper with s = 25 ends in the cement on 3 of 40 streets against 0 for plain switching: the soft mask leans on a plan drafted before the pour.</div>
+    </div>
+    <div class="say" data-say="s7">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Real-Time Chunking freezes the actions that will run before the new chunk lands and inpaints the rest towards the old chunk under a decaying mask. Async timing with far fewer seams and mode flips; reaction still costs d plus the execution horizon, and leaning on the old plan has a price when the world changes.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REVIEW BOARD ============ -->
+<section id="cap" data-title="Review Board" data-n="★">
+  <div class="card">
+    <div class="scene" data-art="cap"></div>
+    <h2>★ Road-crew review board</h2>
+    <p class="lede">Three stripers came back with complaints from the town. For each: run it as configured, pick a fix, re-run it on twenty streets, and name the cause. The tempting wrong fixes are on the list, and they fail for the reason the step taught. Each case is scored on the re-run <em>and</em> the cause.</p>
+    <div id="capcases"></div>
+    <div class="row" style="margin-top:12px"><span class="stars" id="capstars">☆☆☆</span><span class="verdict" id="capverdict"></span></div>
+  </div>
+</section>
+
+<!-- ============ FIELD TEST ============ -->
+<section id="ft" data-title="Field Test" data-n="✓">
+  <div class="card">
+    <h2>✓ Field test</h2>
+    <p class="lede">Ten questions. Answer each by operating the widget in the step named, not from memory. Eight or more earns the check.</p>
+    <div id="ftqs"></div>
+    <div class="btnrow"><button class="act" id="ftgo">Grade me</button><span id="ftscore" style="font:18px var(--hand);align-self:center"></span></div>
+  </div>
+  <div class="card">
+    <h3>What's exact here, and what's a teaching model</h3>
+    <ul class="honest">
+      <li><b>The real algorithms:</b> behaviour cloning as supervised learning on the demonstrator's (observation, action) pairs; DAgger's loop and its β_i = p^(i−1) mixing (Ross, Gordon &amp; Bagnell 2011, Algorithm 3.1); synchronous execution and its idle share d/(d + s); naive asynchronous switching; ACT's temporal ensembling, a query every tick and w_i = exp(−m·i) with w₀ the oldest and m = 0.01 (ACT's released code); SmolVLA's asynchronous queue with threshold g (asked when |A|/n ≤ g, as LeRobot's code does), the g = 0 sequential limit and three of LeRobot's four aggregation rules; Real-Time Chunking's frozen prefix, s = max(d, s_min) and soft mask (eq. 5). Waypoints are indexed by actions executed, not wall time, as LeRobot's async client indexes actions by timestep.</li>
+      <li><b>Teaching models, labelled on the page:</b> the street (two sines), the striper (a unicycle at 1 m/s, 50 Hz), its servo (pure pursuit on the waypoint 12 ticks ahead), the potholes (heading kicks), the cement and its detour, and the master (pure pursuit plus a small wobble) are hand-designed. The apprentice is a 5-nearest-neighbour lookup over the logbook, a real learner but not a neural network; the "big brain" of steps 3–7 is the same lookup with a simulated think time. RTC proper guides a flow-matching sampler; here it is an analogue over the notebook's pages (shift to continue the frozen prefix, weight by masked agreement with a chosen width, blend with the mask): RTC's mask and timing, a stand-in for its guidance. Every run is seeded, so it is the same for everyone.</li>
+      <li><b>The directions are real; the striper isn't a real robot.</b> Real chunks are joint targets from camera frames at the robot's control rate (50 Hz for ACT and π0, 30 fps in SmolVLA's experiments), policies are networks with up to hundreds of millions of parameters, and their failures are messier. The drift, the blobs, the seams, the averaged fork and the frozen prefix are the same ideas at that scale.</li>
+    </ul>
+    <p class="muted" style="font-size:15px;margin-top:10px">Sources (exact quotes and sections in <a href="https://github.com/bakulbadwal/arm-playground/blob/main/demos-to-deployment/SOURCES.md" target="_blank" rel="noopener">SOURCES.md</a>): Capuano et al., <a href="https://arxiv.org/abs/2510.12403" target="_blank" rel="noopener"><em>Robot Learning: A Tutorial</em></a> (2025), §4–5 · Ross, Gordon &amp; Bagnell, <a href="https://arxiv.org/abs/1011.0686" target="_blank" rel="noopener"><em>A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning</em></a> (2011) · Zhao et al., <a href="https://arxiv.org/abs/2304.13705" target="_blank" rel="noopener"><em>Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware</em></a> (ACT, 2023) · Black et al., <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener"><em>π0</em></a> (2024) · Shukor et al., <a href="https://arxiv.org/abs/2506.01844" target="_blank" rel="noopener"><em>SmolVLA</em></a> (2025) and the <a href="https://huggingface.co/docs/lerobot/async" target="_blank" rel="noopener">LeRobot async inference docs</a> · Black, Galliker &amp; Levine, <a href="https://arxiv.org/abs/2506.07339" target="_blank" rel="noopener"><em>Real-Time Execution of Action Chunking Flow Policies</em></a> (2025).</p>
+    <div class="btnrow"><button class="ghost" id="reset">Reset all progress</button></div>
+  </div>
+</section>
+
+<p class="series">Part of a series of hands-on labs: <a href="https://bakulbadwal.github.io/inference-kitchen/">Inference Kitchen</a> (serving) · <a href="https://bakulbadwal.github.io/finishing-school/">Finishing School</a> (post-training) · <a href="https://bakulbadwal.github.io/arm-playground/">Arm Playground</a> (kinematics and control) · <a href="https://bakulbadwal.github.io/policy-pond/">Policy Pond</a> (reinforcement learning) · <a href="https://bakulbadwal.github.io/fork-in-the-road/">Fork in the Road</a> (diffusion policies) · <a href="https://bakulbadwal.github.io/ducks-eye-view/">Duck's-Eye View</a> (robot vision) · <b>Demos to Deployment</b> (imitation learning and real-time execution)</p>
+</div>
+<div id="tip" role="tooltip"></div>
+<footer>Demos to Deployment · an unofficial companion to Hugging Face's Robot Learning tutorial · real algorithms, a toy street · <a href="https://github.com/bakulbadwal/arm-playground/tree/main/demos-to-deployment" style="color:#FFE3CC">source</a></footer>
+
+<script src="js/core.js"></script>
+<script src="js/glossary.js"></script>
+<script src="js/art.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

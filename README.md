@@ -23,6 +23,7 @@
   <a href="https://bakulbadwal.github.io/arm-playground/#r3&step=1"><b>▶ The real arm in 3D</b></a> ·
   <a href="https://bakulbadwal.github.io/arm-playground/workbench.html"><b>▶ Workbench</b></a> ·
   <a href="https://bakulbadwal.github.io/arm-playground/datasets.html"><b>▶ Unit 1 · Datasets</b></a> ·
+  <a href="https://bakulbadwal.github.io/arm-playground/demos-to-deployment/"><b>▶ Demos to Deployment · after Unit 2</b></a> ·
   <a href="#whats-inside">What's inside</a> ·
   <a href="#how-it-compares">How it compares</a> ·
   <a href="#deep-links-for-teachers">Deep links</a>
@@ -142,6 +143,10 @@ Unit 1's only code (page 1.4) is about `delta_timestamps`: asking `LeRobotDatase
 - **The sample, live**: every key of `dataset[t]` with its tensor shape, the `_is_pad` masks, and the batched shapes from a `DataLoader`, including the 0.6.1 quirk that a single-offset video window is squeezed to `[3, 480, 640]` while `action` keeps `[1, 6]`.
 - **The exact Python** for the current window, copyable, plus the working form of streaming (`next(iter(...))`, since `StreamingLeRobotDataset` is an `IterableDataset` and the course's `streaming_dataset[100]` raises).
 - **Six predict-then-check lessons**, from "how many frames is 0.1 s" to why a padded chunk must be masked in the loss (ACT multiplies its L1 loss by `~action_is_pad`).
+
+## Demos to Deployment: what comes after Unit 2
+
+The course stops at Unit 2; Hugging Face's *Robot Learning* tutorial, which it distils, goes on to imitation learning and generalist policies. [**Demos to Deployment**](https://bakulbadwal.github.io/arm-playground/demos-to-deployment/) ([source and docs](demos-to-deployment/)) is a sibling lab for that material, on its own toy world: a line-painting robot learns Main Street from a master painter. It covers behaviour cloning and compounding error (one pothole, 3.80 m of paint off the line), DAgger (one round of the master riding along fixes it), and then the real-time side of action chunking: synchronous inference's idle share d/(d + s), ACT's temporal ensembling averaging two good plans into the wet cement, SmolVLA's asynchronous queue and its threshold g, naive switching's seams, and Real-Time Chunking's frozen prefix and soft mask (at 500 ms of think time, 1 side flip in 40 streets against 26). Same conventions as this repo: real algorithms, labelled toys, `node demos-to-deployment/tests/check.js` prints every number.
 
 ## How it compares
 
