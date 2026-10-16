@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inside a VLA</title>
+<meta name="description" content="A hands-on lab for the anatomy and compute budget of a vision-language-action model: how SmolVLA and π0 turn three camera frames and an instruction into a 50-action chunk, where the milliseconds go, and what each of SmolVLA's efficiency choices buys.">
+<meta property="og:title" content="Inside a VLA: where the milliseconds go when a robot policy writes fifty actions">
+<meta property="og:description" content="Open up a vision-language-action model like an office building: the mailroom that cuts photos into cards, the tower that reads them, the filing cabinet, and the drafting room that writes the work order ten times. Count every card and every FLOP, then build your own.">
+<meta property="og:image" content="https://bakulbadwal.github.io/arm-playground/inside-a-vla/docs/hero.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='14' y='6' width='26' height='52' rx='3' fill='%237B3A63' stroke='%234A2E1E' stroke-width='4'/%3E%3Cpath d='M20 16h14M20 26h14M20 36h14' stroke='%23F4C430' stroke-width='5'/%3E%3Crect x='40' y='30' width='18' height='28' rx='3' fill='%23E2701C' stroke='%234A2E1E' stroke-width='4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!--
+THESIS: A vision-language-action model is a pipeline with a budget. Frames, words and joint readings become tokens; a vision encoder reads every patch; a language-model backbone reads the prefix once and caches it; a small action expert writes the 50-action chunk, once per flow-matching step. SmolVLA's efficiency choices (64 tokens a frame, half the layers, a narrow expert) each cut one line of that budget, and after them the vision encoder is most of what's left. Drawn as a Busytown office building in cross-section. Sibling of Demos to Deployment, Fork in the Road and Inference Kitchen.
+OWN-WORLD: flat gouache on paper; warm-brown outlines; a mulberry masthead; the mailroom, the tower's floors, the filing cabinet and the drafting room as whole fields; Grandstander signboards, Patrick Hand labels, Andika body; painted-sign buttons, price-tag readouts, sticky-note predictions, chalkboard takeaways.
+HONESTY: the shapes, token counts, layer counts and the order of work are SmolVLA's and π0's, from the papers, the released configs and LeRobot's code. FLOPs are counted by a stated formula; milliseconds come from a made-up computer. Both are labelled as teaching models.
+-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><filter id="gouache" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="3" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="1.3" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg>
+<div class="wrap">
+<header>
+  <div class="mast"><b><span class="mi" aria-hidden="true"></span>Inside a VLA</b><span>a hands-on lab</span></div>
+  <div><h1>Where the milliseconds go when a robot policy reads three cameras and writes fifty actions</h1>
+  <p class="sub">Open up a vision-language-action model as if it were an office building: a mailroom that cuts photos into cards, a tower whose floors read them, a filing cabinet, and a drafting room that writes the work order ten times over. SmolVLA is the worked example and π0 the comparison; every card and every FLOP is counted by the page, from the published shapes. About 45 minutes of play.</p></div>
+</header>
+
+<nav id="nav" aria-label="Steps"></nav>
+
+<!-- ============ STEP 0 ============ -->
+<section id="s0" data-title="The Mailroom" data-n="0">
+  <div class="card">
+    <div class="scene" data-art="s0"></div>
+    <h2>0 · The mailroom: frames, words and joints become cards</h2>
+    <p class="lede">Demos to Deployment timed the drafting desk from outside: a big policy thinks for d ticks, then hands over a chunk of 50 actions. This lab opens the desk up. Picture the model as an office building. Photos from the robot's three cameras, a written request ("put the cube in the box") and a slip with the arm's joint readings arrive at the mailroom. Nothing upstairs reads photos or slips: everything travels on <span class="g" data-g="token">cards</span>, all the same size. The cards go up a <span class="g" data-g="backbone">tower</span> of floors, the tower files its notes in a cabinet, and a smaller drafting room next door writes the <span class="g" data-g="chunk">work order</span>. Every term with a wavy red underline is tappable.</p>
+    <div class="kmap">
+      <div><span class="k" data-i="card" aria-hidden="true"></span><b>A card</b> = a token<br><span class="t">photo, word or joint card, all one width</span></div>
+      <div><span class="k" data-i="desk" aria-hidden="true"></span><b>The photo desk</b> = the <span class="g" data-g="encoder">vision encoder</span><br><span class="t">reads every 16-pixel tile (step 1)</span></div>
+      <div><span class="k" data-i="stapler" aria-hidden="true"></span><b>The bundler</b> = <span class="g" data-g="shuffle">pixel shuffle</span><br><span class="t">4 × 4 tiles onto one card (step 0)</span></div>
+      <div><span class="k" data-i="tower" aria-hidden="true"></span><b>The tower</b> = the language-model backbone<br><span class="t">one floor per <span class="g" data-g="layer">layer</span> (steps 1–2)</span></div>
+      <div><span class="k" data-i="staff" aria-hidden="true"></span><b>The floor staff</b> = the <span class="g" data-g="params">weights</span><br><span class="t">every card visits every desk</span></div>
+      <div><span class="k" data-i="meeting" aria-hidden="true"></span><b>The floor meeting</b> = <span class="g" data-g="attention">attention</span><br><span class="t">every card compared with every card</span></div>
+      <div><span class="k" data-i="cabinet" aria-hidden="true"></span><b>The filing cabinet</b> = the <span class="g" data-g="kvcache">KV cache</span><br><span class="t">the tower's notes, filed once (step 3)</span></div>
+      <div><span class="k" data-i="drafting" aria-hidden="true"></span><b>The drafting room</b> = the <span class="g" data-g="expert">action expert</span><br><span class="t">writes 50 lines, ten drafts (step 3)</span></div>
+      <div><span class="k" data-i="clock" aria-hidden="true"></span><b>The stopwatch</b> = <span class="g" data-g="latency">latency</span><br><span class="t">against the robot's <span class="g" data-g="tick">tick</span> (step 4)</span></div>
+    </div>
+    <p class="covers">Covers <b>SmolVLA §3.1</b>: "a pixel shuffle operation, limiting the visual tokens to 64 per frame"; states "projected into a single token"; images resized to 512×512 (§4.3) · <b>SmolVLM §2.2</b>: pixel shuffle cuts tokens by r², r = 4 for small models · <b>PaliGemma §3.2</b>: 224 px gives 256 image tokens · <b>π0 §IV</b>: 2 or 3 images per robot</p>
+  </div>
+
+  <div class="card" data-shot>
+    <h3>Make the cards</h3>
+    <div class="ctl">
+      <div><div class="lbl">the model's mailroom</div><div class="seg" id="s0m"></div></div>
+      <div class="sl"><div class="sl-h"><span>cameras</span><b id="s0camv">3</b></div><input type="range" id="s0cam" min="1" max="3" step="1" value="3" aria-label="Number of cameras"></div>
+      <div><div class="lbl">bundle size r (tiles per side)</div><div class="seg" id="s0r"></div></div>
+    </div>
+    <canvas id="s0c" class="frame" aria-label="One camera frame cut into tiles and bundled into cards, and the prefix of cards that goes upstairs"></canvas>
+    <div class="legend"><span><span class="sw2" style="background:var(--photo)"></span>photo cards</span><span><span class="sw2" style="background:var(--word)"></span>word cards</span><span><span class="sw2" style="background:var(--stcard)"></span>joint card</span></div>
+    <div class="grid g4" style="margin-top:10px">
+      <div class="stat"><div class="v" id="s0p">–</div><div class="l">tiles per frame</div></div>
+      <div class="stat"><div class="v photo" id="s0f">–</div><div class="l">cards per frame</div></div>
+      <div class="stat"><div class="v" id="s0i">–</div><div class="l">photo cards, all cameras</div></div>
+      <div class="stat big"><div class="v" id="s0T">–</div><div class="l">cards in the prefix</div></div>
+    </div>
+    <div class="mathbox" id="s0math"></div>
+    <p class="chartcap">SmolVLA's photo desk is SigLIP-B/16 at 512 px (16-pixel tiles); π0's is SigLIP-So400m/14 at 224 px (14-pixel tiles), with no bundling. Both pad the request to 48 word cards: LeRobot's π0 always does, and the released <code>smolvla_base</code> config does too. π0 sends its joint card to the drafting room instead of the tower, so its tower prefix has no joint card.</p>
+    <div class="predict" data-p="s0a">
+      <div class="tag">Guess first!</div>
+      <div class="q">SmolVLA's frame is 512 × 512 pixels, cut into 16 × 16-pixel tiles, and the bundler staples 4 × 4 tiles onto each card. How many cards per frame?</div>
+      <div class="opts"><button data-a="0">1,024</button><button data-a="1">256</button><button data-a="2" data-right>64</button></div>
+      <div class="why">(512 ÷ 16)² = 1,024 tiles, ÷ 4² = 64 cards: the "64 tokens per frame" in the SmolVLA paper. With three cameras, 48 word cards and one joint card, the prefix is 241 cards.</div>
+    </div>
+    <div class="predict" data-p="s0b">
+      <div class="tag">Guess first!</div>
+      <div class="q">π0 takes three 224 × 224 frames with 14-pixel tiles and no bundling. How many photo cards go up its tower?</div>
+      <div class="opts"><button data-a="0">192</button><button data-a="1" data-right>768</button><button data-a="2">3,072</button></div>
+      <div class="why">(224 ÷ 14)² = 256 per frame, PaliGemma's 256 image tokens, × 3 = 768. Add 48 word cards and π0's tower reads 816, more than three times SmolVLA's 241, from smaller pictures. The difference is the bundler.</div>
+    </div>
+    <div class="say" data-say="s0">
+      <div class="tag">Say it out loud</div>
+      <div class="line">A VLA reads tokens, not pictures: each frame becomes (size ÷ patch)² patches, ÷ r² after pixel shuffle, plus the instruction's word tokens and one state token. SmolVLA: 3 × 64 + 48 + 1 = 241. π0: 3 × 256 + 48 = 816.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 1 ============ -->
+<section id="s1" data-title="The Tower" data-n="1">
+  <div class="card">
+    <div class="scene" data-art="s1"></div>
+    <h2>1 · The tower: what one forward pass costs</h2>
+    <p class="lede">On every floor, two things happen to the cards. Each card visits every desk on the floor: every <span class="g" data-g="params">weight</span> is one multiply and one add per card, so the staff work is 2 × (weights on the floor) × (cards). Then the floor meeting: each card is compared with every other card and takes notes from the relevant ones, which costs 4 × (meeting width) × cards², because the number of pairs grows with the square. Count it in <span class="g" data-g="flops">FLOPs</span>. The photo desk downstairs works the same way, on the tiles of each frame, before they are bundled.</p>
+    <p class="covers">Covers <b>SmolVLA §3.1</b>: visual-token reduction "to obtain a faster inference time" · <b>SmolVLM §2.2</b>: smaller VLMs benefit from r = 4 "as the reduced token count eases attention overhead" · shapes from the released SmolVLM2-500M and SigLIP-So400m configs and π0 appendix A-B</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>The prefix bill</h3>
+    <div class="ctl">
+      <div><div class="lbl">model</div><div class="seg" id="s1m"></div></div>
+      <div><div class="lbl">bundle size r</div><div class="seg" id="s1r"></div></div>
+      <div class="sl"><div class="sl-h"><span>cameras</span><b id="s1camv">3</b></div><input type="range" id="s1cam" min="1" max="3" step="1" value="3" aria-label="Number of cameras"></div>
+    </div>
+    <canvas id="s1bill" class="bill" aria-label="The prefix bill: photo desk, bundler, tower staff and tower meeting, in GFLOP"></canvas>
+    <div class="legend"><span><span class="sw2" style="background:var(--photo)"></span>photo desk (all tiles)</span><span><span class="sw2" style="background:var(--conn)"></span>bundler's projector</span><span><span class="sw2" style="background:var(--staff)"></span>tower staff</span><span><span class="sw2" style="background:var(--meet)"></span>tower meetings</span></div>
+    <div class="grid g4" style="margin-top:10px">
+      <div class="stat"><div class="v" id="s1T">–</div><div class="l">cards up the tower</div></div>
+      <div class="stat"><div class="v photo" id="s1e">–</div><div class="l">photo desk</div></div>
+      <div class="stat"><div class="v staff" id="s1t">–</div><div class="l">tower (staff + meetings)</div></div>
+      <div class="stat"><div class="v" id="s1a">–</div><div class="l">of the tower is meetings</div></div>
+    </div>
+    <canvas id="s1curve" class="chart" aria-label="Tower FLOPs against the number of cards: staff work grows in a straight line, meetings with the square"></canvas>
+    <div class="chartcap">The tower's bill for any pile of cards (this model's floors, 2 per weight per card plus 4 × width × cards² per floor). The dot is the pile above. The staff line is straight; the meeting curve bends up, and only matters once the pile is long.</div>
+    <div class="mathbox" id="s1math"></div>
+    <div class="predict" data-p="s1a">
+      <div class="tag">Guess first!</div>
+      <div class="q">SmolVLA, three cameras, 241 cards. What share of the tower's work is the meetings (attention)?</div>
+      <div class="opts"><button data-a="0" data-right>About 5%</button><button data-a="1">About 25%</button><button data-a="2">About half</button></div>
+      <div class="why">4.5%. At 241 cards the meetings are small next to the staff work: 3.6 of 79.4 GFLOP. Attention's square only takes over for long piles; π0's 816 cards are still only 2.9% meetings, because its floors are wide.</div>
+    </div>
+    <div class="predict" data-p="s1b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Turn SmolVLA's bundler off (r = 1): 3,121 cards instead of 241, 13 times as many. The tower's bill grows by…</div>
+      <div class="opts"><button data-a="0">13×</button><button data-a="1" data-right>about 20×</button><button data-a="2">169× (13²)</button></div>
+      <div class="why">19.9×: from 79 to 1,580 GFLOP. The staff work grows 13×, and the meetings, which were 4.5% of the bill, grow 168× and become 38% of it. That is what the 64-card bundle buys in the tower.</div>
+    </div>
+    <div class="predict" data-p="s1c">
+      <div class="tag">Guess first!</div>
+      <div class="q">With the bundler on, where does most of SmolVLA's prefix compute go?</div>
+      <div class="opts"><button data-a="0">The tower's floors</button><button data-a="1" data-right>The photo desk</button><button data-a="2">The meetings</button></div>
+      <div class="why">The photo desk: 646 of 725 GFLOP, 89%. Bundling cuts what the tower reads, not what the photo desk reads: it still studies all 1,024 tiles of each 512-pixel frame with 86M weights. π0's photo desk reads 256 bigger tiles a frame with 412M weights and costs about the same, 661 GFLOP; there it is only 17% of the prefix, because π0's tower is 2,048 wide.</div>
+    </div>
+    <div class="say" data-say="s1">
+      <div class="tag">Say it out loud</div>
+      <div class="line">A forward pass costs about 2 × weights × tokens, plus attention at 4 × width × tokens² per layer. Fewer visual tokens shrink the backbone's bill; after SmolVLA's pixel shuffle, the vision encoder reading every patch is most of what's left.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 2 ============ -->
+<section id="s2" data-title="Halfway Up" data-n="2">
+  <div class="card">
+    <div class="scene" data-art="s2"></div>
+    <h2>2 · Halfway up: skipping the top floors</h2>
+    <p class="lede">SmolVLM2's tower has 32 floors. SmolVLA closes the top 16: the cards stop at floor 16, and the drafting room reads its notes from there. That is <span class="g" data-g="skip">layer skipping</span>, N = L/2. The drafting room is built with one floor for each floor of the tower it reads (LeRobot's default), so closing tower floors also shortens the drafting room. The paper says it "effectively halv[es] the LLM and action expert's computational cost". How much of the whole chunk is that?</p>
+    <p class="covers">Covers <b>SmolVLA §3.1</b>: "setting N to half the total layers (N = L/2) offers a good tradeoff between speed and performance" · §4.3: "We use only the first 16 layers" · <b>Table 8</b>: LIBERO success by N · <b>LeRobot</b> <code>num_vlm_layers = 16</code>, <code>num_expert_layers = -1</code> (same as the VLM)</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Close floors</h3>
+    <div class="ctl">
+      <div class="sl"><div class="sl-h"><span>floors kept, N (of 32)</span><b id="s2Nv">16</b></div><input type="range" id="s2N" min="4" max="32" step="4" value="16" aria-label="Floors kept"></div>
+      <div class="status" id="s2st" style="margin:0"></div>
+    </div>
+    <canvas id="s2c" class="chart" aria-label="SmolVLA's whole-chunk FLOPs by the number of floors kept, split into photo desk, tower and drafting room, with the paper's LIBERO success rates"></canvas>
+    <div class="legend"><span><span class="sw2" style="background:var(--photo)"></span>photo desk</span><span><span class="sw2" style="background:var(--staff)"></span>tower</span><span><span class="sw2" style="background:var(--expert)"></span>drafting room, 10 drafts</span><span><span class="dot" style="background:var(--grass)"></span>LIBERO success, SmolVLA Table 8</span></div>
+    <div class="grid g4" style="margin-top:10px">
+      <div class="stat"><div class="v staff" id="s2t">–</div><div class="l">tower</div></div>
+      <div class="stat"><div class="v exp" id="s2x">–</div><div class="l">drafting room, 10 drafts</div></div>
+      <div class="stat"><div class="v" id="s2tot">–</div><div class="l">whole chunk</div></div>
+      <div class="stat"><div class="v good" id="s2s">–</div><div class="l">saved against all 32 floors</div></div>
+    </div>
+    <div class="callout co-i">The other two rows of Table 8: keeping every second floor ("Skip %2", half the depth, like N = 16) scored 75.5, and swapping in the whole smaller SmolVLM2-256M scored 75.8, both below the first 16 floors' 78.5. In the paper's words, "skipping layers from a large VLM (here 500M parameters) yields better results than downsizing the VLM".</div>
+    <div class="predict" data-p="s2a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Keep 16 of the 32 floors, which halves the tower and the drafting room. The whole chunk (photo desk, tower, ten drafts) costs how much less than with all 32?</div>
+      <div class="opts"><button data-a="0">Half</button><button data-a="1" data-right>About a fifth</button><button data-a="2">Almost nothing</button></div>
+      <div class="why">19%: 1,029 GFLOP down to 838. The tower and drafting room do halve, from 383 to 192 GFLOP, but the photo desk's 646 GFLOP doesn't move. On LIBERO the paper's success went from 80.3 (32 floors) to 78.5 (16).</div>
+    </div>
+    <div class="predict" data-p="s2b">
+      <div class="tag">Guess first!</div>
+      <div class="q">In Table 8, which scores higher: the first 16 floors of the 500M VLM, or every floor of the smaller 256M VLM?</div>
+      <div class="opts"><button data-a="0" data-right>The first 16 floors of the bigger one</button><button data-a="1">The whole smaller one</button><button data-a="2">They tie</button></div>
+      <div class="why">78.5 against 75.8 average success on LIBERO. Cutting depth kept more of what the bigger model learned than shrinking the whole model did.</div>
+    </div>
+    <div class="say" data-say="s2">
+      <div class="tag">Say it out loud</div>
+      <div class="line">SmolVLA keeps the first half of the backbone's layers and reads features from layer 16, which halves the backbone and the action expert at a small cost in success. It doesn't touch the vision encoder, so the whole chunk gets about a fifth cheaper, not half.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 3 ============ -->
+<section id="s3" data-title="The Drafting Room" data-n="3">
+  <div class="card">
+    <div class="scene" data-art="s3"></div>
+    <h2>3 · The drafting room: ten drafts from one filing</h2>
+    <p class="lede">The work order is written next door by the <span class="g" data-g="expert">action expert</span>: 50 blank lines, one card each, sent through a narrower building (SmolVLA's is 0.75× the tower's width, ~100M weights). It doesn't write the order once. It starts from scribble and redrafts the whole order ten times, each <span class="g" data-g="step">draft</span> a full pass through the drafting room; the tenth goes to the robot. Why drafts, and why scribble, is <a href="https://bakulbadwal.github.io/fork-in-the-road/" target="_blank" rel="noopener">Fork in the Road</a>'s subject (its step 7 is flow matching); here only the cost matters. The trick is that the photos and the request don't change between drafts, so the tower reads them once and files its notes in the <span class="g" data-g="kvcache">filing cabinet</span> (KV caching in general, for serving language models, is <a href="https://bakulbadwal.github.io/inference-kitchen/" target="_blank" rel="noopener">Inference Kitchen</a>'s subject). SmolVLA's drafting floors alternate: on one kind the drafters read only the cabinet (<span class="g" data-g="cross">cross-attention</span>); on the other they read the cabinet and the lines already written above theirs, never below (<span class="g" data-g="self">self-attention</span> with a <span class="g" data-g="causal">causal</span> mask, as LeRobot's code runs it). π0's drafters read the cabinet and the whole order, above and below, on every floor.</p>
+    <p class="covers">Covers <b>SmolVLA §3.1</b>: interleaved cross- and causal self-attention, expert width 0.75 × d · §4.3: n = 50, 10 flow-matching steps, ~100M of 450M parameters in the expert · <b>Tables 6–7</b> · <b>π0 §IV</b>: "caching the attention keys and values for the prefix and only recomputing the suffix … for each integration step" · <b>π0 appendix A-B</b>: expert width 1024, ~300M · <b>LeRobot</b> <code>sample_actions</code>: prefix once with <code>use_cache</code>, then <code>denoise_step</code> × <code>num_steps</code></p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Who reads what, and what it costs</h3>
+    <div class="ctl">
+      <div><div class="lbl">model</div><div class="seg" id="s3m"></div></div>
+      <div class="sl"><div class="sl-h"><span>drafts (flow-matching steps)</span><b id="s3kv">10</b></div><input type="range" id="s3k" min="1" max="10" step="1" value="10" aria-label="Number of drafts"></div>
+      <div class="sl"><div class="sl-h"><span>lines in the order, n</span><b id="s3nv">50</b></div><input type="range" id="s3n" min="10" max="100" step="10" value="50" aria-label="Chunk size"></div>
+      <label class="tg"><input type="checkbox" id="s3cache" checked><span class="sw"></span>use the filing cabinet (KV cache)</label>
+    </div>
+    <canvas id="s3att" class="att" aria-label="Who each action card reads on a cross-attention floor and on a causal self-attention floor"></canvas>
+    <div class="chartcap" id="s3attc"></div>
+    <canvas id="s3bar" class="bill" aria-label="The chunk's bill: photo desk, tower, and one bar per draft"></canvas>
+    <div class="legend"><span><span class="sw2" style="background:var(--photo)"></span>photo desk</span><span><span class="sw2" style="background:var(--staff)"></span>tower</span><span><span class="sw2" style="background:var(--expert)"></span>one draft in the drafting room</span></div>
+    <div class="grid g4" style="margin-top:10px">
+      <div class="stat"><div class="v exp" id="s3P">–</div><div class="l">drafting-room weights</div></div>
+      <div class="stat"><div class="v exp" id="s3p">–</div><div class="l">one draft</div></div>
+      <div class="stat"><div class="v" id="s3r">–</div><div class="l">one draft ÷ the tower's pass</div></div>
+      <div class="stat big"><div class="v" id="s3tot">–</div><div class="l">whole chunk</div></div>
+    </div>
+    <div class="callout co-i">What the paper measured on these choices (LIBERO average success, trained from scratch): cross-attention on every floor (CA) 79.0, causal self-attention on every floor (SA) 74.5, the two alternating (CA+SA) 85.5 (Table 6); inside the order, causal 74.5 against bidirectional 67.5 (Table 7). Chunk size n: 1 → 50.0, 10 → 84.0, 50 → 80.3, 100 → 74.5 (Table 12).</div>
+    <div class="predict" data-p="s3a">
+      <div class="tag">Guess first!</div>
+      <div class="q">SmolVLA. One draft runs 50 cards through ~100M weights; the tower's pass runs 241 cards through 157M. One draft costs about what share of the tower's pass?</div>
+      <div class="opts"><button data-a="0" data-right>About 15%</button><button data-a="1">About half</button><button data-a="2">About the same</button></div>
+      <div class="why">14.1%: 11.2 GFLOP against 79.4. Fewer cards and narrower floors (the cross floors' k and v projections still run over all 241 filed cards on every draft, as LeRobot does: 0.8 of the 11.2). Ten drafts together are 112 GFLOP, more than the tower's pass, but the drafts are small passes, and step 4 shows that small passes are slow in their own way.</div>
+    </div>
+    <div class="predict" data-p="s3b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Throw away the filing cabinet, so π0's tower must reread the 816 cards for every one of its 10 drafts. The whole chunk costs…</div>
+      <div class="opts"><button data-a="0">About 2× as much</button><button data-a="1" data-right>About 8× as much</button><button data-a="2">Exactly 10× as much</button></div>
+      <div class="why">7.9×: 4.4 TFLOP becomes 34.4. π0's tower is 76% of its chunk, so redoing it ten times nearly multiplies the bill by ten (the photo desk still runs once). SmolVLA's tower is small, so without the cabinet SmolVLA pays 1.9×. The bigger the tower, the more the cabinet is worth.</div>
+    </div>
+    <div class="say" data-say="s3">
+      <div class="tag">Say it out loud</div>
+      <div class="line">The prefix is the same for every denoising step, so it is encoded once and its keys and values are cached; the action expert then runs once per step over the 50 action tokens, reading that cache. Latency ≈ prefix + steps × expert pass.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 4 ============ -->
+<section id="s4" data-title="The Stopwatch" data-n="4">
+  <div class="card">
+    <div class="scene" data-art="s4"></div>
+    <h2>4 · The stopwatch: from FLOPs to milliseconds</h2>
+    <p class="lede">FLOPs aren't time. Each stage of the office takes as long as the slower of two things: doing the arithmetic, at the computer's rate F, or walking every weight in from memory once, at bandwidth B. Big piles keep the staff busy (<span class="g" data-g="bound">compute-bound</span>); a draft of 50 cards barely uses each weight before the next is needed, so it waits on memory (memory-bound). This lab's computers are made up, round numbers on purpose (<span class="g" data-g="hw">toy computers</span>); the shape of the answer is what transfers. Then compare the total with the robot's <span class="g" data-g="tick">tick</span>: the number of ticks that pass while the office works is the <span class="g" data-g="d">inference delay d</span> that <a href="https://bakulbadwal.github.io/arm-playground/demos-to-deployment/" target="_blank" rel="noopener">Demos to Deployment</a> hides with asynchronous inference and Real-Time Chunking.</p>
+    <p class="covers">Covers <b>SmolVLA §3.3</b>: "a real-world frame-rate of 30 frames per second, Δt = 33ms"; the queue never runs dry when g ≥ (E[ℓ_S]/Δt)/n · <b>π0</b>: 50 Hz robots, "inference every 0.5 seconds (after executing 25 actions)", timed on an RTX 4090 with 3 cameras · <b>RTC §2</b>: π0 "spends 46ms on the KV cache prefill alone", d := ⌊δ/Δt⌋</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Time one chunk</h3>
+    <div class="ctl">
+      <div><div class="lbl">model</div><div class="seg" id="s4m"></div></div>
+      <div><div class="lbl">toy computer</div><div class="seg" id="s4hw"></div></div>
+      <div><div class="lbl">robot's control rate</div><div class="seg" id="s4rate"></div></div>
+      <div class="sl"><div class="sl-h"><span>drafts</span><b id="s4kv">10</b></div><input type="range" id="s4k" min="1" max="10" step="1" value="10" aria-label="Number of drafts"></div>
+      <div class="sl"><div class="sl-h"><span>lines in the order, n</span><b id="s4nv">50</b></div><input type="range" id="s4n" min="10" max="100" step="10" value="50" aria-label="Chunk size"></div>
+      <div class="sl"><div class="sl-h"><span>cameras</span><b id="s4camv">3</b></div><input type="range" id="s4cam" min="1" max="3" step="1" value="3" aria-label="Number of cameras"></div>
+    </div>
+    <canvas id="s4tl" class="tl" aria-label="Timeline of one chunk: photo desk, tower, then each draft, against the robot's ticks"></canvas>
+    <div class="legend"><span><span class="sw2" style="background:var(--photo)"></span>photo desk</span><span><span class="sw2" style="background:var(--staff)"></span>tower</span><span><span class="sw2" style="background:var(--expert)"></span>drafts</span><span>| a robot tick</span><span>▨ waiting on memory</span></div>
+    <div class="hud">
+      <div class="stat"><div class="v acc" id="s4L">–</div><div class="l">to the chunk</div></div>
+      <div class="stat"><div class="v warn" id="s4d">–</div><div class="l">inference delay d</div></div>
+      <div class="stat"><div class="v" id="s4ch">–</div><div class="l">the order lasts</div></div>
+      <div class="stat"><div class="v" id="s4g">–</div><div class="l">async needs g ≥ (latency ÷ Δt) ÷ n</div></div>
+    </div>
+    <div class="mathbox" id="s4math"></div>
+    <div class="callout co-w" id="s4cal"></div>
+    <div class="predict" data-p="s4a">
+      <div class="tag">Guess first!</div>
+      <div class="q">SmolVLA on the toy desktop GPU takes 11.1 ms. Cut the drafts from 10 to 5. The chunk now takes…</div>
+      <div class="opts"><button data-a="0">About 5.5 ms</button><button data-a="1">About 8 ms</button><button data-a="2" data-right>About 10 ms</button></div>
+      <div class="why">10.1 ms. Each draft is memory-bound at 0.2 ms (reading about 200 MB of weights and cache at 1 TB/s takes longer than 11 GFLOP at 80 TFLOP/s), and the photo desk is 8.1 ms of the 11.1. The same goes for the order's length: 10 lines or 50 take the same 0.2 ms a draft here.</div>
+    </div>
+    <div class="predict" data-p="s4b">
+      <div class="tag">Guess first!</div>
+      <div class="q">SmolVLA on the toy laptop CPU, robot at 30 fps. How many ticks pass before the order arrives (d)?</div>
+      <div class="opts"><button data-a="0">About 2</button><button data-a="1" data-right>About 25</button><button data-a="2">About 250</button></div>
+      <div class="why">838 ms ÷ 33.3 ms = 25.1, so d = 25 ticks. Synchronously the robot would stand still for 25 of every 75 ticks; asynchronously it must ask for the next order with g ≥ 25.1/50 = 0.50 of the order still left (with n = 10 that would be 2.3: no threshold works, the order is shorter than the wait). On the toy desktop GPU the same model lands inside one tick (d = 0).</div>
+    </div>
+    <div class="say" data-say="s4">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Latency ≈ vision encoder + backbone prefill + steps × expert pass, each the slower of its arithmetic and its weight reads. The prefill is compute-bound; a 50-token expert pass is usually memory-bound, so it costs about the same for 10 actions as for 50. d = ⌊latency ÷ Δt⌋ is what execution has to hide.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 5 ============ -->
+<section id="s5" data-title="Side by Side" data-n="5">
+  <div class="card">
+    <div class="scene" data-art="s5"></div>
+    <h2>5 · Side by side: SmolVLA and π0, then build your own</h2>
+    <p class="lede">The two offices, in the papers' words and in this lab's count. Paper figures are marked with their source; the FLOPs and toy milliseconds are this page's arithmetic on the published shapes. The papers report task success, not speed side by side: SmolVLA reports no inference time in milliseconds, and the one π0 timing this lab could check is the 46 ms prefill.</p>
+    <p class="covers">Covers <b>SmolVLA</b> §4.3–4.5, Tables 2–3: 450M vs 3.3B, LIBERO and SO100 results, "around 40% faster to train and consumes 6× less memory" · <b>π0</b> §IV, appendix A-B · <b>RTC §2</b>: the 46 ms prefill</p>
+    <div class="tablewrap"><table class="ladder cmp" id="s5tab"></table></div>
+    <div class="predict" data-p="s5a">
+      <div class="tag">Guess first!</div>
+      <div class="q">π0 has about 7× SmolVLA's parameters (3.3B against 450M). By this lab's count, how many times the FLOPs does it spend per chunk?</div>
+      <div class="opts"><button data-a="0" data-right>About 5×</button><button data-a="1">About 7×</button><button data-a="2">About 20×</button></div>
+      <div class="why">5.2×: 4.37 TFLOP against 0.84. π0's tower is 42× SmolVLA's (816 cards through 18 floors 2,048 wide, against 241 through 16 floors 960 wide), but the photo desks cost about the same, and SmolVLA's is 77% of its chunk. Parameters on the label aren't the bill: what matters is how many tokens pass through which weights, how many times.</div>
+    </div>
+  </div>
+  <div class="card" data-shot>
+    <h3>Build your own office</h3>
+    <div class="presets"><span class="lbl" style="margin:0">start from</span><button class="ghost" id="bSmol">SmolVLA</button><button class="ghost" id="bPi">π0</button></div>
+    <div class="ctl bgrid">
+      <div><div class="lbl">tower</div><div class="seg" id="bTower"></div></div>
+      <div class="sl"><div class="sl-h"><span>floors kept</span><b id="bNv">16</b></div><input type="range" id="bN" min="2" max="32" step="1" value="16" aria-label="Floors kept"></div>
+      <div><div class="lbl">photo desk</div><div class="seg" id="bEyes"></div></div>
+      <div><div class="lbl">bundle size r</div><div class="seg" id="bR"></div></div>
+      <div class="sl"><div class="sl-h"><span>cameras</span><b id="bCamv">3</b></div><input type="range" id="bCam" min="1" max="3" step="1" value="3" aria-label="Number of cameras"></div>
+      <div><div class="lbl">drafting room width (× tower)</div><div class="seg" id="bX"></div></div>
+      <div><div class="lbl">drafting floors read the cabinet</div><div class="seg" id="bMode"></div></div>
+      <div class="sl"><div class="sl-h"><span>drafts</span><b id="bKv">10</b></div><input type="range" id="bK" min="1" max="10" step="1" value="10" aria-label="Number of drafts"></div>
+      <div class="sl"><div class="sl-h"><span>lines in the order, n</span><b id="bNnv">50</b></div><input type="range" id="bNn" min="10" max="100" step="10" value="50" aria-label="Chunk size"></div>
+      <div><div class="lbl">toy computer</div><div class="seg" id="bHw"></div></div>
+      <div><div class="lbl">robot's control rate</div><div class="seg" id="bRate"></div></div>
+    </div>
+    <canvas id="bBar" class="tl" aria-label="Your office's timeline for one chunk, against the robot's ticks"></canvas>
+    <div class="hud">
+      <div class="stat"><div class="v" id="bT">–</div><div class="l">cards up the tower</div></div>
+      <div class="stat"><div class="v" id="bP">–</div><div class="l">weights a chunk runs through</div></div>
+      <div class="stat"><div class="v" id="bF">–</div><div class="l">per chunk</div></div>
+      <div class="stat"><div class="v acc" id="bL">–</div><div class="l">to the chunk · d</div></div>
+    </div>
+    <div class="mathbox" id="bMath"></div>
+    <h3>Three work orders</h3>
+    <p class="lede">Each is solved when the builder above meets it. There's more than one way to meet each; the note says which levers you pulled.</p>
+    <div id="bChal"></div>
+    <div class="say" data-say="s5">
+      <div class="tag">Say it out loud</div>
+      <div class="line">SmolVLA buys speed with fewer visual tokens (64 a frame), half the backbone's layers, and a narrower expert; π0 spends about five times the compute, mostly in a 2B backbone reading 816 tokens. In both, latency = encoder + prefill + steps × expert pass, and the biggest remaining line is the one to cut next.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FIELD TEST ============ -->
+<section id="ft" data-title="Field Test" data-n="✓">
+  <div class="card">
+    <h2>✓ Field test</h2>
+    <p class="lede">Eight questions. Answer each by operating the widget in the step named, not from memory. Seven or more earns the check.</p>
+    <div id="ftqs"></div>
+    <div class="btnrow"><button class="act" id="ftgo">Grade me</button><span id="ftscore" style="font:18px var(--hand);align-self:center"></span></div>
+  </div>
+  <div class="card">
+    <h3>What's exact here, and what's a teaching model</h3>
+    <ul class="honest">
+      <li><b>Exact, from the papers, configs and code:</b> the token counts (SmolVLA: 64 per 512-pixel frame after pixel shuffle with r = 4, one state token; π0: 256 per 224-pixel frame; 48 instruction tokens, which LeRobot's π0 always pads to and the released <code>smolvla_base</code> config pads to as well); the shapes (SmolVLM2-500M's SigLIP-B/16 and 32-layer, 960-wide decoder, of which SmolVLA keeps 16; an expert 0.75× as wide with interleaved cross- and causal self-attention; PaliGemma's SigLIP-So400m/14 and Gemma-2B; π0's 1024-wide expert); n = 50 and 10 flow-matching steps for both; the order of work (encode, prefill once and cache, then one expert pass per step). The weight counts follow from the shapes: 98M for SmolVLA's expert and 311M for π0's, against the papers' "~100M" and "~300M"; SigLIP-B/16 is 93M in the SmolVLM paper and 86M here, because the count has only the matrix weights, not the pooling head, biases and norms.</li>
+      <li><b>Teaching models, labelled on the page:</b> FLOPs are 2 per weight per token plus 4 × (query width) × (queries) × (keys) per attention layer. A cross-attention floor's k and v projections are counted over the 241 cached prefix tokens on every draft, as LeRobot runs them (a tuned stack could do that once per chunk). π0's state token is counted once and cached, as the paper says it can be; LeRobot's code re-embeds it with the actions on every step, one token in 51. Norms, biases, softmax, the small state, action and time projections, and the embedding lookup are left out, and the tower's prefix is counted with full attention. Milliseconds come from made-up computers (toy desktop GPU: 80 TFLOP/s and 1 TB/s; toy edge board: 10 TFLOP/s and 100 GB/s; toy laptop CPU: 1 TFLOP/s and 50 GB/s), each stage taking max(FLOPs ÷ F, weight bytes ÷ B) with bf16 weights. On π0 the toy GPU gives a 49.9 ms prefill against the 46 ms measured on an RTX 4090, close for a big compute-bound pass; for small passes real stacks add kernel-launch and Python overheads this model leaves out, so treat its milliseconds as a floor.</li>
+      <li><b>The office is an analogy.</b> Weights aren't people and attention isn't a meeting; the counts are the real counts. Nothing here measures a real robot.</li>
+    </ul>
+    <p class="muted" style="font-size:15px;margin-top:10px">Sources (exact quotes and sections in <a href="https://github.com/bakulbadwal/arm-playground/blob/main/inside-a-vla/SOURCES.md" target="_blank" rel="noopener">SOURCES.md</a>): Shukor et al., <a href="https://arxiv.org/abs/2506.01844" target="_blank" rel="noopener"><em>SmolVLA</em></a> (2025) · Black et al., <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener"><em>π0</em></a> (2024) · Marafioti et al., <a href="https://arxiv.org/abs/2504.05299" target="_blank" rel="noopener"><em>SmolVLM</em></a> (2025) · Beyer et al., <a href="https://arxiv.org/abs/2407.07726" target="_blank" rel="noopener"><em>PaliGemma</em></a> (2024) · Black, Galliker &amp; Levine, <a href="https://arxiv.org/abs/2506.07339" target="_blank" rel="noopener"><em>Real-Time Execution of Action Chunking Flow Policies</em></a> (2025) · the <a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">LeRobot</a> SmolVLA and π0 code and the released model configs.</p>
+    <div class="btnrow"><button class="ghost" id="reset">Reset all progress</button></div>
+  </div>
+</section>
+
+<p class="series">Part of a series of hands-on labs: <a href="https://bakulbadwal.github.io/inference-kitchen/">Inference Kitchen</a> (serving) · <a href="https://bakulbadwal.github.io/finishing-school/">Finishing School</a> (post-training) · <a href="https://bakulbadwal.github.io/arm-playground/">Arm Playground</a> (kinematics and control) · <a href="https://bakulbadwal.github.io/policy-pond/">Policy Pond</a> (reinforcement learning) · <a href="https://bakulbadwal.github.io/reward-arcade/">Reward Arcade</a> (environments and evals) · <a href="https://bakulbadwal.github.io/fork-in-the-road/">Fork in the Road</a> (diffusion policies) · <a href="https://bakulbadwal.github.io/ducks-eye-view/">Duck's-Eye View</a> (robot vision) · <a href="https://bakulbadwal.github.io/arm-playground/demos-to-deployment/">Demos to Deployment</a> (imitation learning and real-time execution) · <a href="https://bakulbadwal.github.io/ducks-eye-view/eye-exam/">Eye Exam</a> (camera calibration) · <a href="https://bakulbadwal.github.io/policy-pond/dual-controls/">Dual Controls</a> (real-world RL with a human in the loop) · <b>Inside a VLA</b> (VLA anatomy and compute)</p>
+</div>
+<div id="tip" role="tooltip"></div>
+<footer>Inside a VLA · an unofficial companion to the SmolVLA and π0 papers · real shapes, counted FLOPs, a toy stopwatch · <a href="https://github.com/bakulbadwal/arm-playground/tree/main/inside-a-vla" style="color:#F6DDEB">source</a></footer>
+
+<script src="js/core.js"></script>
+<script src="js/glossary.js"></script>
+<script src="js/art.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
