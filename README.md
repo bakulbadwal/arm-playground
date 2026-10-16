@@ -24,6 +24,7 @@
   <a href="https://bakulbadwal.github.io/arm-playground/workbench.html"><b>▶ Workbench</b></a> ·
   <a href="https://bakulbadwal.github.io/arm-playground/datasets.html"><b>▶ Unit 1 · Datasets</b></a> ·
   <a href="https://bakulbadwal.github.io/arm-playground/demos-to-deployment/"><b>▶ Demos to Deployment · after Unit 2</b></a> ·
+  <a href="https://bakulbadwal.github.io/arm-playground/inside-a-vla/"><b>▶ Inside a VLA</b></a> ·
   <a href="#whats-inside">What's inside</a> ·
   <a href="#how-it-compares">How it compares</a> ·
   <a href="#deep-links-for-teachers">Deep links</a>
@@ -147,6 +148,10 @@ Unit 1's only code (page 1.4) is about `delta_timestamps`: asking `LeRobotDatase
 ## Demos to Deployment: what comes after Unit 2
 
 The course stops at Unit 2; Hugging Face's *Robot Learning* tutorial, which it distils, goes on to imitation learning and generalist policies. [**Demos to Deployment**](https://bakulbadwal.github.io/arm-playground/demos-to-deployment/) ([source and docs](demos-to-deployment/)) is a sibling lab for that material, on its own toy world: a line-painting robot learns Main Street from a master painter. It covers behaviour cloning and compounding error (one pothole, 3.80 m of paint off the line), DAgger (one round of the master riding along fixes it), and then the real-time side of action chunking: synchronous inference's idle share d/(d + s), ACT's temporal ensembling averaging two good plans into the wet cement, SmolVLA's asynchronous queue and its threshold g, naive switching's seams, and Real-Time Chunking's frozen prefix and soft mask (at 500 ms of think time, 1 side flip in 40 streets against 26). Same conventions as this repo: real algorithms, labelled toys, `node demos-to-deployment/tests/check.js` prints every number.
+
+## Inside a VLA: where the milliseconds go
+
+Demos to Deployment treats the big policy's think time as a given. [**Inside a VLA**](https://bakulbadwal.github.io/arm-playground/inside-a-vla/) ([source and docs](inside-a-vla/)) opens it up, with SmolVLA as the worked example and π0 as the comparison: how three camera frames and an instruction become 241 tokens, what the backbone's floors cost and what skipping half of them buys, why the prefix is cached while the action expert runs once per flow-matching step, and what that adds up to against the control period on three toy computers. Every weight and FLOP is counted from the released configs; `node inside-a-vla/tests/check.js` prints every number.
 
 ## How it compares
 
